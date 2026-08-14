@@ -285,7 +285,11 @@ def build_live_setup(
                         },
                     },
                 ]
-            }
+            },
+            # Web-search grounding fallback: Gemini searches the live web ONLY
+            # when RAG has no answer for a Solitaire Unity fact. Fast + automatic
+            # (googleSearch is server-side; no extra round-trip code needed).
+            {"googleSearch": {}}
         ],
     }
     if realtime_input_config:
