@@ -687,6 +687,18 @@ class GreetingPcmToleranceTests(unittest.TestCase):
 class CampaignRepeatTests(unittest.TestCase):
     """Repeating campaign auto-relaunch (repeat_type daily/weekly)."""
 
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        init_db(self.tmp.name)
+        helpers.reset_operational_tables()
+
+    def tearDown(self):
+        try:
+            close_db()
+        except Exception:
+            pass
+        self.tmp.cleanup()
+
     def test_daily_repeat_relaunches_when_queue_drained(self):
         from core.orchestration_runtime import _auto_relaunch_repeating_campaigns
         from core.state import save_campaign_config
