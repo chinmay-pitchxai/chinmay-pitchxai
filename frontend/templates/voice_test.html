@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+    <title>Vernika | Neural Voice Test</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="apple-ui">
+<div class="vp-voice-page">
+    <nav class="vp-voice-topnav">
+        <a href="/console" class="btn btn-ghost btn-sm touch-target">← Console</a>
+        <span class="text-small text-muted">Standalone voice link</span>
+    </nav>
+
+    <div class="vp-voice-stack">
+        <span id="status" class="badge badge-primary vp-voice-status">System Ready</span>
+
+        <div id="orb" class="vp-voice-orb" role="presentation" aria-hidden="true"></div>
+
+        <div class="vp-voice-wave" id="wave" aria-hidden="true"></div>
+
+        <div class="vp-voice-heading">
+            <h1 class="vp-page-title">Neural Live Link</h1>
+            <p id="subtext" class="vp-page-sub text-center" style="margin-left: auto; margin-right: auto;">Test your prompted persona in real-time</p>
+        </div>
+
+        <div class="vp-voice-controls">
+            <button type="button" id="start-btn" class="btn btn-primary btn-lg" onclick="startTest()">Start Neural Link</button>
+            <button type="button" id="stop-btn" class="btn btn-secondary btn-lg" onclick="stopTest()" disabled>Disconnect</button>
+        </div>
+        <p id="auto-hint" class="text-small text-muted text-center" style="margin-top:8px;">The link starts automatically when you load this page.</p>
+
+        <div class="card vp-voice-persona">
+            <div style="padding: var(--space-xl); text-align: center;">
+                <p class="text-xs text-muted" style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--space-sm);">Active Persona</p>
+                <p id="role-label" class="vp-voice-persona-role"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.add('light-mode');
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const role = urlParams.get('role') || 'sales_1';
+    document.getElementById('role-label').innerText = role;
+
+    let ws = null;
+    let audioContext = null;
+    let processor = null;
+    let microphone = null;
+    let autoStarted = false;
+
+    const orb = document.getElementById('orb');
+    const status = document.getElementById('status');
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const autoHint = document.getElementById('auto-hint');
+
+    const wave = document.getElementById('wave');
+    for (let i = 0; i < 30; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'wave-bar';
+        bar.style.height = '4px';
+        wave.appendChild(bar);
+    }
+
+    function resumeAudioContext() {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().catch(() => {});
+        }
+    }
+    document.addEventListener('click', resumeAudioContext, { once: true });
+    document.addEventListener('touchstart', resumeAudioContext, { once: true });
+
+    async function startTest() {
+        try {
+            status.innerText = 'Connecting…';
+            startBtn.disabled = true;
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/web-demo?role=${role}`);
+
+            ws.onopen = async () => {
+                status.innerText = 'Neural Link Established';
+                orb.classList.add('active');
+                stopBtn.disabled = false;
+                await initAudio();
+            };
+
+            ws.onmessage = async (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'interrupted') {
+                    status.innerText = 'Interrupted — listening…';
+                    if (audioContext && audioContext.state === 'running') {
+                        audioContext.suspend().catch(() => {});
+                    }
+                    return;
+                }
+                if (msg.type === 'audio') {
+                    playResponse(msg.data);
+                }
+            };
+
+            ws.onclose = () => {
+                status.innerText = 'Link Severed';
+                orb.classList.remove('active');
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                if (audioContext) audioContext.close();
+            };
+        } catch (e) {
+            console.error(e);
+            status.innerText = 'Initialization Failed';
+            startBtn.disabled = false;
+        }
+    }
+
+    async function initAudio() {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        microphone = audioContext.createMediaStreamSource(stream);
+
+        processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        processor.onaudioprocess = (e) => {
+            const inputData = e.inputBuffer.getChannelData(0);
+            const pcmData = new Int16Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+                pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
+                ws.send(JSON.stringify({ type: 'audio', data: base64 }));
+            }
+
+            updateWave(inputData);
+        };
+
+        microphone.connect(processor);
+        processor.connect(audioContext.destination);
+    }
+
+    function updateWave(data) {
+        const bars = document.querySelectorAll('.vp-voice-wave .wave-bar');
+        const step = Math.floor(data.length / bars.length);
+        for (let i = 0; i < bars.length; i++) {
+            const val = Math.abs(data[i * step]) * 40;
+            bars[i].style.height = `${Math.max(4, val)}px`;
+        }
+    }
+
+    function playResponse(base64) {
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().catch(() => {});
+        }
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const pcm = new Int16Array(bytes.buffer);
+
+        const floatData = new Float32Array(pcm.length);
+        for (let i = 0; i < pcm.length; i++) floatData[i] = pcm[i] / 0x7FFF;
+
+        const buffer = audioContext.createBuffer(1, floatData.length, 16000);
+        buffer.getChannelData(0).set(floatData);
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
+    }
+
+    function stopTest() {
+        if (ws) ws.close();
+        if (audioContext) audioContext.close();
+        if (autoHint) autoHint.style.display = 'none';
+    }
+
+    // Auto-start the neural link as soon as the page loads.
+    window.addEventListener('DOMContentLoaded', function () {
+        if (autoStarted) return;
+        autoStarted = true;
+        status.innerText = 'Auto-starting…';
+        startBtn.disabled = true;
+        startTest();
+    });
+</script>
+</body>
+</html>

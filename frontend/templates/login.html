@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss:; font-src 'self';">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#F5F5F7">
+    <title>Technopolis | Sign In</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .login-container {
+            display: flex;
+            min-height: 100dvh;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            padding: max(var(--space-lg), env(safe-area-inset-top,0px))
+                     max(var(--space-lg), env(safe-area-inset-right,0px))
+                     max(var(--space-lg), env(safe-area-inset-bottom,0px))
+                     max(var(--space-lg), env(safe-area-inset-left,0px));
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: var(--space-3xl);
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-2xl);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: var(--space-3xl);
+        }
+
+        .login-logo {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto var(--space-xl);
+            background: var(--black);
+            border-radius: var(--radius-2xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--white);
+            box-shadow: var(--shadow-md);
+            position: relative;
+        }
+
+        .login-logo::before {
+            content: "• •";
+            position: absolute;
+            font-size: 13px;
+            letter-spacing: 5px;
+            top: 16px;
+            font-weight: 900;
+            color: var(--white);
+            line-height: 1;
+        }
+
+        .login-logo::after {
+            content: "";
+            position: absolute;
+            bottom: 16px;
+            width: 16px;
+            height: 2.5px;
+            background: var(--white);
+            border-radius: 2px;
+            opacity: 0.7;
+        }
+
+        .login-title {
+            font-size: var(--text-2xl);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: var(--space-sm);
+            color: var(--text);
+        }
+
+        .login-subtitle {
+            font-size: var(--text-sm);
+            color: var(--text-secondary);
+            margin-bottom: 0;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xl);
+            margin-bottom: var(--space-xl);
+        }
+
+        .login-form input {
+            padding: var(--space-lg);
+            font-size: var(--text-base);
+            border-radius: var(--radius-xl);
+        }
+
+        .login-error {
+            display: none;
+            padding: var(--space-lg);
+            background: rgba(255,59,48,0.08);
+            border: 1px solid rgba(255,59,48,0.15);
+            border-radius: var(--radius-xl);
+            color: var(--danger);
+            font-size: var(--text-sm);
+            font-weight: 500;
+        }
+
+        .login-error.show { display: block; }
+
+        .login-button {
+            padding: var(--space-lg) var(--space-xl);
+            font-size: var(--text-base);
+            font-weight: 700;
+            border-radius: var(--radius-pill);
+        }
+
+        .login-footer {
+            text-align: center;
+            font-size: var(--text-xs);
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">&nbsp;</div>
+                <h1 class="login-title">Technopolis</h1>
+                <p class="login-subtitle">AI Communication Platform</p>
+            </div>
+
+            <div id="session-banner" class="login-error" style="display:none;margin-bottom:16px;background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border);padding:12px;border-radius:12px;font-size:13px;line-height:1.5;"></div>
+
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <input type="email" id="email" placeholder="Email" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+                </div>
+
+                <div id="error-msg" class="login-error"></div>
+
+                <button type="submit" class="btn btn-primary btn-lg btn-block login-button" id="btn-submit">
+                    Sign In
+                </button>
+            </form>
+
+            <div class="login-footer">&copy; 2026 Technopolis</div>
+        </div>
+    </div>
+
+    <script>
+        function loginApiRoot() {
+            if (typeof window !== 'undefined' && window.__VERN_API_ROOT__)
+                return String(window.__VERN_API_ROOT__).replace(/\/$/, '');
+            const meta = document.querySelector('meta[name="vernika-api-root"]');
+            if (meta && meta.content && meta.content.trim())
+                return meta.content.trim().replace(/\/$/, '');
+            return '';
+        }
+        function loginApiUrl(p) {
+            const path = p.startsWith('/') ? p : '/' + p;
+            const root = loginApiRoot();
+            return root ? root + path : path;
+        }
+        function clearLoginSession() {
+            localStorage.removeItem('vernika_token');
+            localStorage.removeItem('vernika_role');
+            localStorage.removeItem('vernika_email');
+            window.location.reload();
+        }
+
+        (async function checkExistingSession() {
+            const tok = localStorage.getItem('vernika_token');
+            const banner = document.getElementById('session-banner');
+            if (!tok || !banner) return;
+            try {
+                const res = await fetch(loginApiUrl('/api/me'), {
+                    headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) {
+                    clearLoginSession();
+                    return;
+                }
+                const data = await res.json();
+                banner.style.display = 'block';
+                banner.innerHTML = 'Signed in as <strong>' + (data.email || 'user') + '</strong> (Technopolis). '
+                    + '<a href="/console" style="color:var(--primary);font-weight:600;">Open dashboard</a> '
+                    + '· <a href="#" id="login-clear-session" style="color:var(--text-secondary);">Sign out</a>';
+                const link = document.getElementById('login-clear-session');
+                if (link) link.onclick = function (ev) { ev.preventDefault(); clearLoginSession(); };
+            } catch (_) {}
+        })();
+
+        document.getElementById('login-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim().toLowerCase();
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('error-msg');
+            const btn = document.getElementById('btn-submit');
+
+            errorMsg.classList.remove('show');
+            btn.disabled = true;
+            btn.innerText = 'Verifying...';
+
+            try {
+                const res = await fetch(loginApiUrl('/api/login'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ email: email, password: password }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('vernika_token', data.token);
+                    const role = (data.dashboard_role || data.role || 'sales_1').toLowerCase();
+                    localStorage.setItem('vernika_role', role);
+                    localStorage.setItem('vernika_email', email);
+
+                    btn.innerText = '✓ Authorized';
+                    setTimeout(() => { window.location.href = '/console'; }, 600);
+                } else {
+                    errorMsg.innerText = 'Invalid email or password. Please try again.';
+                    errorMsg.classList.add('show');
+                    btn.disabled = false;
+                    btn.innerText = 'Sign In';
+                }
+            } catch (err) {
+                errorMsg.innerText = 'Connection error. Please check your internet and try again.';
+                errorMsg.classList.add('show');
+                btn.disabled = false;
+                btn.innerText = 'Sign In';
+            }
+        };
+    </script>
+</body>
+</html>

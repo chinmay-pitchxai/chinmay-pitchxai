@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <!-- Root-relative resolution for CSS/anchors (works for /, /ui, /bridge, etc.) -->
+  <base href="/" />
+  <title>Vernika Bridge — Operator</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body class="apple-ui">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◇</span>
+      <div>
+        <div class="brand-title">Vernika Bridge</div>
+        <div class="brand-sub">Vobiz ↔ Gemini Live</div>
+      </div>
+    </div>
+    <div class="pill" id="connPill" data-state="loading">
+      <span class="dot" id="connDot"></span>
+      <span id="connLabel">Checking…</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero card">
+      <h1>Operator console</h1>
+      <p class="lead">
+        You are viewing the web UI at
+        <strong id="pageOrigin">—</strong>
+        — same host/port your browser used to load this page.
+      </p>
+      <p class="muted small">
+        Bookmark that URL. For Vobiz webhooks, use your public tunnel URL in
+        <code>VOBIZ_PUBLIC_BASE_URL</code>, not necessarily this address.
+      </p>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>Server health</h2>
+        <label class="toggle">
+          <input type="checkbox" id="autoRefresh" checked />
+          Auto-refresh (5s)
+        </label>
+      </div>
+      <pre id="health" class="health-pre">Loading…</pre>
+      <div class="actions">
+        <button type="button" id="btn">Refresh now</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>API quick reference</h2>
+      <ul class="endpoints">
+        <li>
+          <a id="healthLink" href="/health" target="_blank" rel="noopener"><code>GET /health</code></a>
+          <span class="hint">JSON — open in new tab</span>
+        </li>
+        <li><code>POST · GET</code> <code>/vobiz/answer</code> <span class="hint">Vobiz answer XML</span></li>
+        <li><code>WS</code> <code>/ws/vobiz</code> <span class="hint">Media socket (telephony)</span></li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const elHealth = document.getElementById("health");
+      const elBtn = document.getElementById("btn");
+      const elAuto = document.getElementById("autoRefresh");
+      const elPill = document.getElementById("connPill");
+      const elDot = document.getElementById("connDot");
+      const elLabel = document.getElementById("connLabel");
+      document.getElementById("pageOrigin").textContent =
+        window.location.origin + window.location.pathname;
+
+      const HEALTH_URL = "/health";
+      document.getElementById("healthLink").setAttribute("href", HEALTH_URL);
+
+      let timer = null;
+
+      function setState(state, label) {
+        elPill.dataset.state = state;
+        elLabel.textContent = label;
+        elDot.dataset.pulse = state === "ok" ? "yes" : "no";
+      }
+
+      async function loadHealth() {
+        try {
+          const r = await fetch(HEALTH_URL, { cache: "no-store" });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          const j = await r.json();
+          elHealth.textContent = JSON.stringify(j, null, 2);
+          setState("ok", "Reachable · " + (j.status || "healthy"));
+        } catch (e) {
+          elHealth.textContent = String(e);
+          setState("err", "Unreachable");
+        }
+      }
+
+      function reschedule() {
+        if (timer) clearInterval(timer);
+        timer = null;
+        if (elAuto.checked) timer = setInterval(loadHealth, 5000);
+      }
+
+      elBtn.addEventListener("click", loadHealth);
+      elAuto.addEventListener("change", reschedule);
+      loadHealth();
+      reschedule();
+    })();
+  </script>
+</body>
+</html>
