@@ -1,0 +1,11 @@
+# Force LF for code files (kill Windows CRLF drift)
+* text=auto
+*.py text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.txt text eol=lf
+*.json text eol=lf

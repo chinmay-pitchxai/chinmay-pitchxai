@@ -31,7 +31,7 @@ def _facts_from_body(title: str, body: str) -> list[str]:
             facts.append(m.group(1).strip())
         elif ":" in ln and not ln.startswith("#"):
             facts.append(ln)
-        elif len(ln) > 20:
+        elif "**" in ln or len(ln) > 20:
             facts.append(ln)
     if not facts and body.strip():
         facts = [body.strip()[:500]]

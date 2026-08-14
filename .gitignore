@@ -48,4 +48,12 @@ screenshot.jpg
 
 # Business documents (not for public repo)
 whatsapp details needs to shair/
-watchdog/.hermes_watchdog_last.txt
+!backend/data/sales_1/rag_source.txt
+!backend/data/sales_1/kb_chunks.json
+!backend/prompts/sales_1_prompt.txt
+!backend/prompts/whatsapp_assistant_prompt.txt
+backend/data/*
+!backend/data/sales_1/
+backend/data/sales_1/*
+!backend/data/sales_1/rag_source.txt
+!backend/data/sales_1/kb_chunks.json

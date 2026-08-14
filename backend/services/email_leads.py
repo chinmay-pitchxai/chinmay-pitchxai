@@ -189,7 +189,7 @@ def _send_email_project_details_sync(
 
 async def send_email_project_details(
     to_email: str,
-    subject: str = "Solitaire Unity — Premium Row Villas | Project Details",
+    subject: str = "Solitaire Unity — Premium Gated Apartments | Project Details",
     summary: str = "",
     outbound_phone: str = "",
 ) -> dict[str, Any]:
@@ -375,7 +375,7 @@ def _send_bulk_project_email_sync(
     msg = MIMEMultipart("mixed")
     msg["From"] = f"Technopolis Constructions <{settings.smtp_email}>"
     msg["To"] = to_email
-    msg["Subject"] = "🌴 Solitaire Unity — Premium Spanish‑Themed Villas | Project Details"
+    msg["Subject"] = "🌴 Solitaire Unity — Premium Gated Apartments | Project Details"
 
     # Alternative body (text + html)
     msg_body = MIMEMultipart("alternative")

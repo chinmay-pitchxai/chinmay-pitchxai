@@ -1,0 +1,3 @@
+STATUS=ANOMALY
+glitch=low
+detail:glitch_count_10m=2
