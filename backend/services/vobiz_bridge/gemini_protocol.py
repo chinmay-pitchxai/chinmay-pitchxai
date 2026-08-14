@@ -116,7 +116,12 @@ def build_live_setup(
             "prebuiltVoiceConfig": {"voiceName": voice},
         },
     }
-    _lang = (language or getattr(settings, "gemini_live_language", None) or "").strip()
+    # Empty string explicitly passed = auto-detect (multilingual mirror). Only
+    # fall back to the env default when the caller passes nothing at all.
+    if language is not None:
+        _lang = (language or "").strip()
+    else:
+        _lang = (getattr(settings, "gemini_live_language", None) or "").strip()
     if _lang:
         speech_config["languageCode"] = _lang
 

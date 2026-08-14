@@ -2754,10 +2754,11 @@ async def handle_vobiz_ws_live(
             _live_lang, _mirror = resolved_live_language(role)
             if _mirror:
                 _lang_instruction = (
-                    f"\n\n[LANGUAGE] Speak primarily in {_live_lang} (the configured primary language). "
-                    "If the caller speaks a different language (English, Hindi, Telugu, Kannada, "
-                    "Tamil, Hinglish, Tenglish), mirror them naturally — switch to their language "
-                    "mid-conversation and continue in it. Code-switch like a real local consultant."
+                    "\n\n[LANGUAGE MIRROR — ABSOLUTE] The caller's language decides your language. "
+                    "If they speak Kannada, Telugu, Hindi, Tamil, Hinglish, Tenglish or any Indian "
+                    "language, your VERY NEXT reply must be in that language — no English lead-in, "
+                    "no announcement, no delay. English is never the default when they speak another "
+                    "language. Code-switch like a real local consultant."
                 )
             else:
                 _lang_instruction = (
@@ -2770,7 +2771,10 @@ async def handle_vobiz_ws_live(
                 voice=voice,
                 vad_ultra=vad_ultra,
                 temperature=None,
-                language=_live_lang,
+                # Mirror ON: no languageCode pin — Gemini auto-detects the caller's
+                # language (Kannada/Telugu/Hindi...) instead of assuming en-IN.
+                # Mirror OFF: pin to the configured language.
+                language=("" if _mirror else _live_lang),
             )
 
             async def _send_setup_and_kicks() -> None:
