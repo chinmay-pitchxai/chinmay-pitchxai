@@ -1989,7 +1989,59 @@ async def handle_vobiz_ws_live(
             digest = _rag_digest(_RAG_SOURCE_TEXT)
             if digest:
                 return f"[KB — reference digest]\n{digest}"
+        # ── Scoped web-search fallback (last resort) ─────────────────────────
+        # RAG had nothing. Search the live web — ALWAYS scoped to the project
+        # so Gemini never pulls other Technopolis projects. Hard 5s cap keeps
+        # the live conversation low-delay. Injected as [SYSTEM WEB SEARCH].
+        try:
+            block = _scoped_web_search(q)
+            if block:
+                return block
+        except Exception as _web_err:
+            logger.debug("Scoped web search failed: {}", _web_err)
         return None
+
+    def _scoped_web_search(q: str) -> Optional[str]:
+        """DuckDuckGo search scoped to Technopolis Solitaire Unity <q>."""
+        import html as _html
+        import urllib.parse
+
+        project_scope = "Technopolis Solitaire Unity Kondapur"
+        query = project_scope + " " + q
+        url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(query)
+        try:
+            import httpx
+
+            resp = httpx.get(
+                url,
+                timeout=5.0,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                },
+            )
+            if resp.status_code != 200:
+                return None
+            titles = re.findall(r'class="result__a"[^>]*>(.*?)</a>', resp.text, re.S)
+            snips = re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', resp.text, re.S)
+            results: list[str] = []
+            for i, t in enumerate(titles[:4]):
+                title = _html.unescape(re.sub(r"<[^>]+>", "", t)).strip()
+                if not title:
+                    continue
+                snip = ""
+                if i < len(snips):
+                    snip = _html.unescape(re.sub(r"<[^>]+>", "", snips[i])).strip()
+                results.append(title + (" — " + snip[:200] if snip else ""))
+            if not results:
+                return None
+            lines = ["[SYSTEM WEB SEARCH — Solitaire Unity only]"]
+            lines.append("Live search results for Solitaire Unity (use ONLY these; ignore any other Technopolis project in results):")
+            for i, r in enumerate(results, 1):
+                lines.append(str(i) + ". " + r)
+            return "\n".join(lines)[:1400]
+        except Exception:
+            return None
 
     def live_rag_context(q: str) -> Optional[str]:
         return _rag_block_for_query(q, require_question=True)
