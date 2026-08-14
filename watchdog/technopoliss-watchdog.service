@@ -1,0 +1,15 @@
+[Unit]
+Description=Technopoliss self-healing watchdog (single tick)
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/technopoliss/watchdog/technopoliss-watchdog.sh
+Environment=WATCHDOG_CONF=/opt/technopoliss/watchdog/watchdog.conf
+StateDirectory=technopoliss-watchdog
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

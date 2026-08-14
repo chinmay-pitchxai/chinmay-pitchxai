@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Voice Calling Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#9bcbff",
+                        "outline-variant": "#e5bdb9",
+                        "on-error": "#ffffff",
+                        "background": "#f8f9fa",
+                        "surface-tint": "#be0a18",
+                        "inverse-surface": "#2e3132",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#00857f",
+                        "surface": "#f8f9fa",
+                        "surface-container": "#edeeef",
+                        "inverse-on-surface": "#f0f1f2",
+                        "tertiary": "#006a65",
+                        "on-primary-container": "#ffffff",
+                        "on-tertiary-fixed-variant": "#00504c",
+                        "secondary-fixed": "#d0e4ff",
+                        "surface-container-low": "#f3f4f5",
+                        "secondary-container": "#5cb1ff",
+                        "outline": "#916f6b",
+                        "surface-container-highest": "#e1e3e4",
+                        "surface-variant": "#e1e3e4",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-bright": "#f8f9fa",
+                        "error": "#ba1a1a",
+                        "on-secondary-container": "#00426e",
+                        "primary": "#bd0917",
+                        "on-secondary-fixed-variant": "#004a79",
+                        "primary-fixed": "#ffdad6",
+                        "on-surface": "#191c1d",
+                        "tertiary-fixed-dim": "#55dad1",
+                        "surface-container-high": "#e7e8e9",
+                        "on-surface-variant": "#5c403d",
+                        "primary-fixed-dim": "#ffb4ac",
+                        "surface-dim": "#d9dadb",
+                        "on-tertiary-container": "#ffffff",
+                        "on-secondary-fixed": "#001d34",
+                        "primary-container": "#e22d2d",
+                        "on-background": "#191c1d",
+                        "inverse-primary": "#ffb4ac",
+                        "tertiary-fixed": "#75f7ee",
+                        "secondary": "#00629f",
+                        "on-tertiary-fixed": "#00201e",
+                        "on-primary-fixed": "#410002",
+                        "error-container": "#ffdad6",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#93000e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "section-gap": "1rem",
+                        "sidebar-width": "220px",
+                        "gutter": "0.75rem",
+                        "container-padding": "0.875rem",
+                        "page-margin": "1.25rem"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md-mobile": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["11.2px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["12.6px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-sm": ["9.8px", { "lineHeight": "14px", "fontWeight": "400" }],
+                        "label-md": ["8.4px", { "lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg": ["21px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "display-lg": ["33.6px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-sm": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "label-sm": ["7.7px", { "lineHeight": "10px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-md-mobile": ["14px", { "lineHeight": "18px", "fontWeight": "600" }],
+                        "headline-md": ["16.8px", { "lineHeight": "22px", "fontWeight": "600" }]
+                    },
+                    "boxShadow": {
+                        "ambient": "0 4px 20px -2px rgba(0, 29, 52, 0.15)"
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom styling stylesheet loading -->
+    <link href="index.css" rel="stylesheet">
+    
+    <style>
+        body { background-color: theme('colors.background'); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1; }
+        
+        /* Chart Styles */
+        .chart-bar { background-color: theme('colors.tertiary-container'); border-radius: 4px 4px 0 0; transition: height 0.4s ease, opacity 0.2s ease; cursor: pointer; }
+        .chart-bar:hover { opacity: 0.85; filter: brightness(1.05); }
+        
+        .donut-segment-1, .donut-segment-2, .donut-segment-3, .donut-segment-4 { 
+            cursor: pointer; 
+            transition: stroke-dasharray 0.4s ease, stroke-dashoffset 0.4s ease, stroke-width 0.2s ease, filter 0.2s ease; 
+        }
+        .donut-segment-1:hover, .donut-segment-2:hover, .donut-segment-3:hover, .donut-segment-4:hover { 
+            stroke-width: 18px; 
+            filter: brightness(1.05); 
+        }
+
+        /* Dark mode overrides */
+        .dark body { background-color: #0f172a; color: #f8fafc; }
+        .dark aside { background-color: #1e293b; border-color: #334155; }
+        .dark header { background-color: #1e293b; border-color: #334155; }
+        .dark main { background-color: #0f172a; }
+        .dark .bg-surface { background-color: #1e293b; color: #f8fafc; }
+        .dark .text-on-surface { color: #f8fafc; }
+        .dark .text-on-surface-variant { color: #94a3b8; }
+        .dark .border-surface-container { border-color: #334155; }
+        .dark .border-outline-variant { border-color: #334155; }
+        .dark .bg-surface-container { background-color: #334155; }
+        .dark .bg-surface-container-low { background-color: #1e293b; }
+        .dark .bg-surface-container-highest { background-color: #475569; }
+        .dark .hover\:bg-surface-container-low:hover { background-color: #334155; }
+        .dark input { background-color: #334155; color: #ffffff; }
+        .dark select { background-color: #334155; color: #ffffff; border-color: #475569; }
+        .dark option { background-color: #1e293b; }
+
+        /* Campaign sandbox tabs */
+        .camp-tab {
+            text-align: left;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .camp-tab:hover {
+            border-color: #93c5fd;
+        }
+        .camp-tab.active {
+            border-color: #1e40af;
+            background: #eff6ff;
+            box-shadow: 0 0 0 1px #1e40af;
+        }
+        .dark .camp-tab {
+            border-color: #334155;
+            background: #1e293b;
+        }
+        .dark .camp-tab:hover {
+            border-color: #475569;
+        }
+        .dark .camp-tab.active {
+            border-color: #60a5fa;
+            background: #1e3a5f;
+            box-shadow: 0 0 0 1px #60a5fa;
+        }
+    </style>
+</head>
+<body class="text-on-background font-body-md overflow-x-hidden min-h-screen flex">
+<svg aria-hidden="true" class="inline-defs-container" style="position:absolute;width:0;height:0;overflow:hidden"></svg>
+
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[220px] bg-surface border-r border-outline-variant flex flex-col z-50">
+    <div class="flex flex-col gap-4 p-4 w-full h-full justify-between">
+        <div class="flex flex-col gap-6">
+            <!-- Overview Section -->
+            <div class="flex flex-col gap-2">
+                <span class="text-label-md font-label-md text-on-surface-variant px-3 uppercase tracking-widest">Overview</span>
+                <a class="nav-link flex items-center gap-3 px-3 py-2 bg-primary text-on-primary rounded-lg shadow-md transition-transform scale-[0.98]" href="#" data-view="dashboard">
+                    <span class="material-symbols-outlined fill">grid_view</span>
+                    <span class="text-body-md font-body-md font-medium">Dashboard</span>
+                </a>
+                <a class="nav-link flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors duration-200 rounded-lg" href="#" data-view="campaigns">
+                    <span class="material-symbols-outlined">send</span>
+                    <span class="text-body-md font-body-md">Campaigns</span>
+                </a>
+            </div>
+            <!-- Tools Section -->
+            <div class="flex flex-col gap-2">
+                <span class="text-label-md font-label-md text-on-surface-variant px-3 uppercase tracking-widest">Tools</span>
+                <a class="nav-link flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors duration-200 rounded-lg" href="#" data-view="make-a-call">
+                    <span class="material-symbols-outlined">call</span>
+                    <span class="text-body-md font-body-md">Make a Call</span>
+                </a>
+                <a class="nav-link flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors duration-200 rounded-lg" href="#" data-view="config">
+                    <span class="material-symbols-outlined">settings</span>
+                    <span class="text-body-md font-body-md">Configuration</span>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Footer Section -->
+        <div class="flex flex-col gap-4 mt-auto">
+            <!-- Sandbox Selection (Moved from dashboard body) -->
+            <div class="flex flex-col gap-2 border-t border-outline-variant pt-4">
+                <span class="text-label-md font-label-md text-on-surface-variant uppercase tracking-widest px-3">Sandbox Selection</span>
+                <div class="flex flex-col gap-1.5 w-full">
+                    <button class="sandbox-btn w-full py-1.5 bg-primary text-on-primary rounded-lg text-body-sm font-body-sm font-medium text-center shadow-sm transition-all">
+                        <span class="block leading-tight">Sandbox 1</span>
+                        <span class="block text-[9px] opacity-80 leading-tight">1.1 P1/P2 Cold · 1.2 P3 Digital Excel</span>
+                    </button>
+                    <button class="sandbox-btn w-full py-1.5 text-on-surface-variant rounded-lg text-body-sm font-body-sm text-center hover:bg-surface-container transition-all">
+                        <span class="block leading-tight">Sandbox 2</span>
+                        <span class="block text-[9px] opacity-70 leading-tight">P4,P5,P6 Retry</span>
+                    </button>
+                    <button class="sandbox-btn w-full py-1.5 text-on-surface-variant rounded-lg text-body-sm font-body-sm text-center hover:bg-surface-container transition-all">
+                        <span class="block leading-tight">Sandbox 3</span>
+                        <span class="block text-[9px] opacity-70 leading-tight">P7,P8 Nurture</span>
+                    </button>
+                    <button class="sandbox-btn w-full py-1.5 text-on-surface-variant rounded-lg text-body-sm font-body-sm text-center hover:bg-surface-container transition-all">
+                        <span class="block leading-tight">Sandbox 4</span>
+                        <span class="block text-[9px] opacity-70 leading-tight">P9 Feedback</span>
+                    </button>
+                </div>
+            </div>
+            
+            <button id="theme-toggle-btn" class="flex items-center justify-center gap-2 px-3 py-2 border border-outline-variant rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors w-full">
+                <span class="material-symbols-outlined text-sm">dark_mode</span>
+                <span class="text-body-md font-body-md">Dark Mode</span>
+            </button>
+            <button class="flex items-center justify-center gap-2 px-3 py-2 border border-primary text-primary rounded-lg hover:bg-primary-fixed transition-colors w-full" onclick="window.showToast('You have successfully logged out.', 'info')">
+                <span class="text-body-md font-body-md font-medium">Log Out</span>
+            </button>
+        </div>
+    </div>
+</aside>
+
+<!-- Main Content Area -->
+<main class="flex-1 ml-[220px] min-h-screen flex flex-col">
+    <!-- TopAppBar -->
+    <header class="bg-surface flex justify-between items-center w-full px-page-margin h-16 sticky top-0 z-40 shadow-sm border-b border-surface-container">
+        <h1 class="text-headline-md font-headline-md text-on-surface tracking-tight">Dashboard Overview</h1>
+         <div class="hidden">
+             <div class="relative hidden md:block">
+                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+                 <input class="pl-9 pr-4 py-1.5 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-secondary text-body-sm w-64" placeholder="Search logs..." type="text" id="header-search-logs" oninput="window.appState.tableSearch = this.value; window.renderCallLogsTable();">
+             </div>
+             <!-- Campaign Status Indicator -->
+             <div id="campaign-status-badge" class="hidden md:flex items-center gap-2 px-3 py-1 rounded-full border border-outline-variant text-xs font-semibold">
+                 <span class="w-2 h-2 rounded-full bg-outline-variant" id="campaign-status-dot"></span>
+                 <span id="campaign-status-text" class="text-on-surface-variant">Checking…</span>
+             </div>
+             <button class="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-full transition-colors relative" onclick="window.showToast('You have no new notifications.', 'info')">
+                 <span class="material-symbols-outlined">notifications</span>
+                 <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full"></span>
+             </button>
+             <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold overflow-hidden border border-outline-variant cursor-pointer" onclick="window.showToast('Active Role Session: ' + window.appState.currentRole)">
+                 Y
+             </div>
+         </div>
+    </header>
+
+     <!-- VIEW: DASHBOARD -->
+     <div id="view-dashboard" class="p-page-margin flex flex-col gap-section-gap max-w-[1600px] mx-auto w-full">
+         <!-- Quick Actions Bar -->
+         <div class="flex items-center justify-between bg-surface rounded-lg border border-surface-container shadow-sm p-3">
+             <div class="flex items-center gap-3">
+                 <span class="text-label-md font-label-md text-on-surface-variant uppercase">Quick Actions</span>
+                 <button id="btn-start-campaign" class="px-4 py-1.5 bg-tertiary text-on-tertiary rounded-lg text-xs font-bold hover:opacity-90 transition-all" onclick="window.quickStartCampaign()">
+                     <span class="material-symbols-outlined text-sm align-middle">play_arrow</span> Start Campaign
+                 </button>
+                 <button id="btn-stop-campaign" class="px-4 py-1.5 border border-error text-error rounded-lg text-xs font-bold hover:bg-error/10 transition-all" onclick="window.stopCampaign()">
+                     <span class="material-symbols-outlined text-sm align-middle">stop</span> Stop
+                 </button>
+                 <button class="px-4 py-1.5 border border-outline-variant text-on-surface-variant rounded-lg text-xs font-bold hover:bg-surface-container transition-all" onclick="window.loadRealLeads().then(() => window.updateDashboardUI())">
+                     <span class="material-symbols-outlined text-sm align-middle">refresh</span> Refresh Data
+                 </button>
+                 <button class="px-4 py-1.5 border border-error text-error rounded-lg text-xs font-bold hover:bg-error/10 transition-all" onclick="window.campaignControlClear()">
+                     <span class="material-symbols-outlined text-sm align-middle">delete_forever</span> Clear Data
+                 </button>
+             </div>
+             <div class="flex items-center gap-2 text-xs text-on-surface-variant">
+                 <span class="material-symbols-outlined text-sm">group</span>
+                 <span>Role: <strong class="text-on-surface" id="header-role-name">sales_1</strong></span>
+             </div>
+         </div>
+
+         <!-- KPI Row 1 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter">
+            <!-- KPI Card 1: Total Leads -->
+            <div onclick="window.openKpiModal('total')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 cursor-pointer">
+                <span class="text-label-md font-label-md text-on-surface-variant uppercase">Total Lead</span>
+                <div class="flex items-end justify-between">
+                    <span id="kpi-total-val" class="text-display-lg font-display-lg text-on-surface">8,420</span>
+                    <span class="text-body-sm font-body-sm text-tertiary flex items-center"><span class="material-symbols-outlined text-sm">arrow_upward</span> 12%</span>
+                </div>
+                <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('total')">Details →</button>
+            </div>
+            <!-- KPI Card 2: Calls Made -->
+            <div onclick="window.openKpiModal('called')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 cursor-pointer">
+                <span class="text-label-md font-label-md text-on-surface-variant uppercase">Call Made</span>
+                <div class="flex items-end justify-between">
+                    <span id="kpi-called-val" class="text-display-lg font-display-lg text-on-surface">5,120</span>
+                    <span class="text-body-sm font-body-sm text-tertiary flex items-center"><span class="material-symbols-outlined text-sm">arrow_upward</span> 8%</span>
+                </div>
+                <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('called')">Details →</button>
+            </div>
+            <!-- KPI Card 3: Interested -->
+            <div onclick="window.openKpiModal('interested')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 relative overflow-hidden cursor-pointer">
+                <div class="absolute inset-0 bg-primary opacity-5"></div>
+                <span class="text-label-md font-label-md text-primary uppercase relative z-10">Interested</span>
+                <div class="flex items-end justify-between relative z-10">
+                    <span id="kpi-interested-val" class="text-display-lg font-display-lg text-on-surface">2,215</span>
+                    <span class="text-body-sm font-body-sm text-tertiary flex items-center"><span class="material-symbols-outlined text-sm">arrow_upward</span> 24%</span>
+                </div>
+                <button class="text-[10px] text-primary font-semibold text-left mt-1 relative z-10" onclick="event.stopPropagation();window.openKpiModal('interested')">Details →</button>
+            </div>
+            <!-- KPI Card 4: Conversion Rate -->
+            <div onclick="window.openKpiModal('conversion')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 cursor-pointer">
+                <span class="text-label-md font-label-md text-on-surface-variant uppercase">Conversion Rate</span>
+                <div class="flex items-end justify-between">
+                    <span id="kpi-conv-val" class="text-display-lg font-display-lg text-on-surface">43%</span>
+                    <span class="text-body-sm font-body-sm text-error flex items-center"><span class="material-symbols-outlined text-sm">arrow_downward</span> 2%</span>
+                </div>
+                <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('conversion')">Details →</button>
+            </div>
+        </div>
+
+        <!-- KPI Row 2 (Secondary Metrics) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter">
+            <!-- Metric 1: WhatsApp Sent -->
+            <div onclick="window.openKpiModal('whatsapp_sent')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
+                <div class="flex flex-col">
+                    <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">WhatsApp Sent</span>
+                    <span id="kpi-whatsapp-val" class="text-headline-sm font-headline-sm text-on-surface">1,240</span>
+                    <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('whatsapp_sent')">Details →</button>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary">
+                    <span class="material-symbols-outlined">chat</span>
+                </div>
+            </div>
+            <!-- Metric 2: Site Visit Scheduled -->
+            <div onclick="window.openKpiModal('site_visit_scheduled')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
+                <div class="flex flex-col">
+                    <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Site Visit Schedule</span>
+                    <span id="kpi-sitevisit-val" class="text-headline-sm font-headline-sm text-on-surface">320</span>
+                    <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('site_visit_scheduled')">Details →</button>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary">
+                    <span class="material-symbols-outlined">location_on</span>
+                </div>
+            </div>
+            <!-- Metric 3: Not Interested -->
+            <div onclick="window.openKpiModal('not_interested')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
+                <div class="flex flex-col">
+                    <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Not Interested</span>
+                    <span id="kpi-notinterested-val" class="text-headline-sm font-headline-sm text-on-surface">1,585</span>
+                    <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('not_interested')">Details →</button>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-error-container flex items-center justify-center text-error">
+                    <span class="material-symbols-outlined">thumb_down</span>
+                </div>
+            </div>
+            <!-- Metric 4: Callbacks -->
+            <div onclick="window.openKpiModal('callbacks')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
+                <div class="flex flex-col">
+                    <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Callbacks</span>
+                    <span id="kpi-callbacks-val" class="text-headline-sm font-headline-sm text-on-surface">450</span>
+                    <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('callbacks')">Details →</button>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+                    <span class="material-symbols-outlined">phone_callback</span>
+                </div>
+            </div>
+        </div>
+
+
+
+         <!-- Campaign Process Flow -->
+         <div class="bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding">
+             <h2 class="text-headline-sm font-headline-sm text-on-surface mb-4">Campaign Automation Pipeline</h2>
+             <!-- Pipeline Stages -->
+             <div class="flex items-center justify-between gap-2 mb-6 overflow-x-auto pb-2">
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-primary">upload_file</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">Lead Upload</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-upload-count">0</span>
+                 </div>
+                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-secondary">pending_actions</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">Pending</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-pending-count">0</span>
+                 </div>
+                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-tertiary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-tertiary">phone_in_talk</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">Dialing</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-dialing-count">0</span>
+                 </div>
+                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-tertiary-fixed/30 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-tertiary">task_alt</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">Answered</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-answered-count">0</span>
+                 </div>
+                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-error">call_missed</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">No Answer</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-failed-count">0</span>
+                 </div>
+                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-primary">thumb_up</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">Interested</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-interested-count">0</span>
+                 </div>
+                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-secondary-fixed/30 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-secondary">event</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">Callback</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-callback-count">0</span>
+                 </div>
+                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
+                 <div class="flex flex-col items-center min-w-[100px]">
+                     <div class="w-12 h-12 rounded-full bg-tertiary-container/30 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-tertiary">location_on</span></div>
+                     <span class="text-[10px] font-bold text-on-surface text-center">Site Visit</span>
+                     <span class="text-[9px] text-on-surface-variant" id="pipe-sitevisit-count">0</span>
+                 </div>
+             </div>
+             <!-- Sandbox Flow -->
+             <div class="grid grid-cols-4 gap-3">
+                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+                     <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-primary"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 1</span></div>
+                     <p class="text-[9px] text-on-surface-variant mb-1">P1, P2 (Cold) · P3 (Digital)</p>
+                     <span class="text-sm font-bold text-primary" id="sb1-count">0</span>
+                 </div>
+                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+                     <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-secondary"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 2</span></div>
+                     <p class="text-[9px] text-on-surface-variant mb-1">P4, P5, P6 — Retry Engine</p>
+                     <span class="text-sm font-bold text-secondary" id="sb2-count">0</span>
+                 </div>
+                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+                     <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-tertiary"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 3</span></div>
+                     <p class="text-[9px] text-on-surface-variant mb-1">P7, P8 — Nurture &amp; Blue Loop</p>
+                     <span class="text-sm font-bold text-tertiary" id="sb3-count">0</span>
+                 </div>
+                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+                     <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-outline"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 4</span></div>
+                     <p class="text-[9px] text-on-surface-variant mb-1">P9 — Post-Visit Feedback</p>
+                     <span class="text-sm font-bold text-on-surface-variant" id="sb4-count">0</span>
+                 </div>
+             </div>
+         </div>
+
+         <!-- Main Charts Area -->
+         <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+            <!-- Engagement Timeline (Area Chart) -->
+            <div class="lg:col-span-8 bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding flex flex-col h-[400px]">
+                <div class="flex justify-between items-start mb-6">
+                    <h2 class="text-headline-sm font-headline-sm text-on-surface">Engagement Timeline</h2>
+                    <div class="flex gap-2">
+                        <button id="engagement-btn-all" class="engagement-filter-btn px-3 py-1 rounded-full border border-primary text-primary text-label-sm font-label-sm uppercase bg-primary-fixed/20" onclick="window.setEngagementTimelineFilter('all')">Total Calls</button>
+                        <button id="engagement-btn-interested" class="engagement-filter-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.setEngagementTimelineFilter('Interested')">Interested</button>
+                        <button id="engagement-btn-clear" class="px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm italic hover:bg-surface-container" onclick="window.setEngagementTimelineFilter('all')">Clear</button>
+                        <div class="flex items-center gap-1.5 ml-2"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Interested</span></div>
+                    </div>
+                </div>
+                <!-- Custom SVG Area Chart -->
+                <div class="flex-1 w-full relative mt-4">
+                    <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 800 250">
+                        <!-- Grid lines -->
+                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="200" y2="200"></line>
+                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="150" y2="150"></line>
+                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="100" y2="100"></line>
+                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="50" y2="50"></line>
+                        
+                        <!-- Area Gradients -->
+                        <defs>
+                            <linearGradient id="areaGradient" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stop-color="#bd0917" stop-opacity="0.2"></stop>
+                                <stop offset="100%" stop-color="#bd0917" stop-opacity="0.0"></stop>
+                            </linearGradient>
+                            <linearGradient id="interestedGradient" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stop-color="#00857f" stop-opacity="0.2"></stop>
+                                <stop offset="100%" stop-color="#00857f" stop-opacity="0.0"></stop>
+                            </linearGradient>
+                        </defs>
+                        
+                        <!-- Total Calls Area (Red) -->
+                        <path id="svg-calls-fill" d="M0,230 L100,230 L200,180 L300,50 L400,230 L500,230 L600,230 L700,230 L800,230 L800,250 L0,250 Z" fill="url(#areaGradient)"></path>
+                        <path id="svg-calls-line" d="M0,230 L100,230 L200,180 L300,50 L400,230 L500,230 L600,230 L700,230 L800,230" fill="none" stroke="#bd0917" stroke-width="2"></path>
+                        
+                        <!-- Interested Area (Teal) -->
+                        <path id="svg-int-fill" d="M0,230 L100,230 L200,210 L300,120 L400,230 L500,230 L600,230 L700,230 L800,230 L800,250 L0,250 Z" fill="url(#interestedGradient)"></path>
+                        <path id="svg-int-line" d="M0,230 L100,230 L200,210 L300,120 L400,230 L500,230 L600,230 L700,230 L800,230" fill="none" stroke="#00857f" stroke-width="2"></path>
+                        
+                        <!-- Data Points -->
+                        <circle id="chart-marker-calls" cx="300" cy="50" fill="#bd0917" r="4"></circle>
+                        <circle id="chart-marker-int" cx="300" cy="120" fill="#00857f" r="4"></circle>
+                        
+                        <!-- Tooltip line cursor -->
+                        <line id="chart-tooltip-line" x1="0" y1="30" x2="0" y2="230" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4" style="display:none;" />
+                        
+                        <!-- Tooltip highlighted dots -->
+                        <circle id="chart-tooltip-dot-calls" cx="0" cy="0" r="5" fill="#bd0917" stroke="#ffffff" stroke-width="1.5" style="display:none;" />
+                        <circle id="chart-tooltip-dot-int" cx="0" cy="0" r="5" fill="#00857f" stroke="#ffffff" stroke-width="1.5" style="display:none;" />
+                        
+                        <!-- Invisible mouse interaction overlay -->
+                        <rect id="chart-hover-overlay" x="0" y="0" width="800" height="250" fill="transparent" style="cursor: crosshair;" />
+                    </svg>
+                    
+                    <!-- Floating Tooltip Card -->
+                    <div id="chart-tooltip-card" class="absolute bg-surface border border-outline-variant rounded-lg p-2.5 shadow-lg text-xs pointer-events-none" style="display: none; z-index: 50; min-width: 140px;">
+                        <div id="chart-tooltip-date" class="font-bold text-on-surface mb-1">Date</div>
+                        <div class="flex items-center gap-1.5 text-on-surface-variant mb-0.5">
+                            <span class="w-2 h-2 rounded-full bg-primary"></span>
+                            <span>Total Calls: </span><span id="chart-tooltip-val-calls" class="font-bold text-on-surface ml-auto">0</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-on-surface-variant">
+                            <span class="w-2 h-2 rounded-full bg-[#00857f]"></span>
+                            <span>Interested: </span><span id="chart-tooltip-val-int" class="font-bold text-on-surface ml-auto">0</span>
+                        </div>
+                    </div>
+                    <!-- X-Axis Labels -->
+                    <div class="absolute bottom-0 w-full flex justify-between text-label-sm font-label-sm text-on-surface-variant px-2 transform translate-y-full pt-2">
+                        <span>Sat</span>
+                        <span>Sun</span>
+                        <span>Mon</span>
+                        <span>Tue</span>
+                        <span>Wed</span>
+                        <span>Thu</span>
+                        <span>Fri</span>
+                    </div>
+                    <!-- Y-Axis Labels -->
+                    <div id="chart-y-axis" class="absolute left-0 h-full flex flex-col justify-between text-label-sm font-label-sm text-on-surface-variant transform -translate-x-full pr-2" style="top: 0; padding-bottom: 20px;">
+                        <span>800</span>
+                        <span>600</span>
+                        <span>400</span>
+                        <span>200</span>
+                        <span>0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outcome Distribution (Donut Chart) -->
+            <div class="lg:col-span-4 bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding flex flex-col h-[400px]">
+                <div class="flex justify-between items-start mb-6">
+                    <h2 class="text-headline-sm font-headline-sm text-on-surface">Outcome Distribution</h2>
+                </div>
+                <div class="flex-1 flex flex-col items-center justify-center relative">
+                    <div class="relative w-48 h-48">
+                        <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" fill="transparent" r="40" stroke="#f3f4f5" stroke-width="15"></circle>
+                            <circle id="donut-seg-1" cx="50" cy="50" fill="transparent" r="40" stroke="#bd0917" stroke-dasharray="180 251.2" stroke-dashoffset="0" stroke-width="15" class="donut-segment-1"></circle>
+                            <circle id="donut-seg-2" cx="50" cy="50" fill="transparent" r="40" stroke="#e5bdb9" stroke-dasharray="40 251.2" stroke-dashoffset="-180" stroke-width="15" class="donut-segment-2"></circle>
+                            <circle id="donut-seg-3" cx="50" cy="50" fill="transparent" r="40" stroke="#5cb1ff" stroke-dasharray="20 251.2" stroke-dashoffset="-220" stroke-width="15" class="donut-segment-3"></circle>
+                            <circle id="donut-seg-4" cx="50" cy="50" fill="transparent" r="40" stroke="#00857f" stroke-dasharray="11.2 251.2" stroke-dashoffset="-240" stroke-width="15" class="donut-segment-4"></circle>
+                            <circle cx="50" cy="50" fill="transparent" r="40" stroke="#ffffff" stroke-dasharray="2 178 2 38 2 18 2 9.2" stroke-dashoffset="0" stroke-width="16" pointer-events="none"></circle>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span id="donut-center-count" class="text-headline-md font-headline-md text-on-surface">2,215</span>
+                            <span id="donut-center-label" class="text-label-sm font-label-sm text-on-surface-variant">Total</span>
+                        </div>
+                    </div>
+                    <!-- Floating Donut Tooltip Card -->
+                    <div id="donut-tooltip-card" class="absolute bg-surface border border-outline-variant rounded-lg p-2 shadow-lg text-xs pointer-events-none" style="display: none; z-index: 50; min-width: 120px;">
+                        <div id="donut-tooltip-title" class="font-bold text-on-surface mb-0.5">Category</div>
+                        <div class="flex items-center gap-1.5 text-on-surface-variant">
+                            <span id="donut-tooltip-color" class="w-2.5 h-2.5 rounded-full"></span>
+                            <span>Value: </span><span id="donut-tooltip-val" class="font-bold text-on-surface ml-auto">0</span>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex flex-wrap justify-center gap-3">
+                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-primary"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Interested</span></div>
+                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-outline-variant"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Failed</span></div>
+                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-secondary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Call Later</span></div>
+                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Answered</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hourly Distribution -->
+        <div id="hourly-distribution" class="bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding w-full mb-8 relative">
+            <div class="flex justify-between items-start mb-6">
+                <h2 class="text-headline-sm font-headline-sm text-on-surface">Hourly Distribution</h2>
+                <div class="flex gap-2">
+                    <button id="hourly-btn-all" class="hourly-range-btn px-3 py-1 rounded-full border border-primary text-primary text-label-sm font-label-sm uppercase bg-primary-fixed/20" onclick="window.filterHourlyDistribution('all')">All Hours</button>
+                    <button id="hourly-btn-morning" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('morning')">6-9A</button>
+                    <button id="hourly-btn-lateam" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('lateam')">9-12P</button>
+                    <button id="hourly-btn-afternoon" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('afternoon')">12-3P</button>
+                    <button id="hourly-btn-evening" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('evening')">3-6P</button>
+                    <button id="hourly-btn-night" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('night')">6-9P</button>
+                </div>
+            </div>
+            <div class="h-[200px] flex items-end justify-around gap-2 mt-4 px-4 border-b border-surface-container-high pb-2 relative">
+                <!-- Background Grid -->
+                <div class="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2 opacity-30">
+                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
+                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
+                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
+                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
+                </div>
+                <!-- Bars -->
+                <div class="w-8 chart-bar h-[5%] z-10" data-bar-idx="0"></div>
+                <div class="w-8 chart-bar h-[25%] z-10" data-bar-idx="1"></div>
+                <div class="w-8 chart-bar h-[12%] z-10" data-bar-idx="2"></div>
+                <div class="w-8 chart-bar h-[30%] z-10" data-bar-idx="3"></div>
+                <div class="w-8 chart-bar h-[60%] z-10" data-bar-idx="4"></div>
+                <div class="w-8 chart-bar h-[45%] z-10" data-bar-idx="5"></div>
+                <div class="w-8 chart-bar h-[55%] z-10" data-bar-idx="6"></div>
+                <div class="w-8 chart-bar h-[95%] z-10 bg-primary" data-bar-idx="7"></div> <!-- Peak Hour -->
+                <div class="w-8 chart-bar h-[90%] z-10" data-bar-idx="8"></div>
+                <div class="w-8 chart-bar h-[85%] z-10" data-bar-idx="9"></div>
+                <div class="w-8 chart-bar h-[75%] z-10" data-bar-idx="10"></div>
+                <div class="w-8 chart-bar h-[65%] z-10" data-bar-idx="11"></div>
+            </div>
+            <div class="flex justify-around mt-2 text-label-sm font-label-sm text-on-surface-variant px-4">
+                <span>12A</span><span>2A</span><span>4A</span><span>6A</span><span>8A</span><span>10A</span><span>12P</span><span>2P</span><span>4P</span><span>6P</span><span>8P</span><span>10P</span>
+            </div>
+            
+            <!-- Floating Bar Tooltip Card -->
+            <div id="bar-tooltip-card" class="absolute bg-surface border border-outline-variant rounded-lg p-2.5 shadow-lg text-xs pointer-events-none" style="display: none; z-index: 50; min-width: 130px;">
+                <div id="bar-tooltip-hour" class="font-bold text-on-surface mb-1">Hour Interval</div>
+                <div class="flex items-center gap-1.5 text-on-surface-variant">
+                    <span class="w-2.5 h-2.5 rounded bg-tertiary-container"></span>
+                    <span>Calls Made: </span><span id="bar-tooltip-val" class="font-bold text-on-surface ml-auto">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table / Logs Canvas -->
+        <div class="bg-surface rounded-lg border border-surface-container shadow-ambient overflow-hidden w-full mb-8">
+            <!-- Table Header / Filter Bar -->
+            <div class="p-4 border-b border-surface-container flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-label-md font-label-md text-on-surface-variant uppercase mr-2">Filter</span>
+                        <button class="qf-btn px-3 py-1 bg-primary text-on-primary rounded-full text-label-sm font-label-sm uppercase" data-filter="all">All</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Interested">Interested</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Not Interested">Not Interested</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Callback">Callback</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Failed">Failed</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Inbound">Inbound</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="star4"><span class="material-symbols-outlined text-sm align-middle">star</span> 4+</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <input id="logs-search-input" class="pl-4 pr-4 py-1.5 bg-surface-container rounded-md border border-outline-variant text-body-sm w-48 focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Search name / phone..." type="text">
+                        </div>
+                         <button class="px-4 py-1.5 border border-outline-variant rounded-md text-body-sm font-medium hover:bg-surface-container transition-all" onclick="window.downloadLeadsCSV()">Export CSV</button>
+                    </div>
+                </div>
+                 <div class="flex gap-4 items-center flex-wrap">
+                     <select id="filter-location" class="bg-surface border border-outline-variant rounded-md px-3 py-1 text-body-sm w-48 cursor-pointer focus:outline-none">
+                         <option>All Locations</option>
+                         <option>Technopolis Solitaire Unity</option>
+                         <option>Technopolis Luxury Residences</option>
+                         <option>Technopolis Commercial Space</option>
+                     </select>
+                     <select id="filter-budget" class="bg-surface border border-outline-variant rounded-md px-3 py-1 text-body-sm w-48 cursor-pointer focus:outline-none">
+                         <option>All Budgets</option>
+                         <option>Under 1.5Cr</option>
+                         <option>1.5Cr - 2.0Cr</option>
+                     </select>
+                     <div class="flex items-center gap-2 border border-outline-variant rounded-md px-3 py-1">
+                         <span class="text-label-sm text-on-surface-variant uppercase">From</span>
+                         <input type="date" id="filter-date-from" class="text-body-sm bg-transparent border-none focus:outline-none cursor-pointer">
+                         <span class="text-on-surface-variant">–</span>
+                         <span class="text-label-sm text-on-surface-variant uppercase">To</span>
+                         <input type="date" id="filter-date-to" class="text-body-sm bg-transparent border-none focus:outline-none cursor-pointer">
+                     </div>
+                     <button class="px-3 py-1 text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors" onclick="window.clearDateFilter()">Clear Dates</button>
+                 </div>
+            </div>
+            
+            <!-- Data Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-surface-container-low border-b border-surface-container">
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Contact</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Phone</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Date/Time</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase w-1/4">Summary (Transcript QA)</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Rating</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Outcome</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Failure Reason</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Recording</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Transcript</th>
+                        </tr>
+                    </thead>
+                    <tbody id="call-logs-tbody" class="text-body-sm">
+                        <!-- Injected by app.js -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEW: CAMPAIGNS -->
+    <div id="view-campaigns" class="p-page-margin flex flex-col gap-section-gap max-w-[1200px] mx-auto w-full" style="display:none;">
+
+        <section id="campaign-control-panel" class="hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-headline-md font-headline-md text-on-surface">Campaign Control</h2><div class="flex gap-2 text-[11px] font-semibold"><span id="campaign-control-live" class="px-2.5 py-1 rounded-full bg-surface-container">Checking service…</span><span id="campaign-control-status" class="px-2.5 py-1 rounded-full bg-surface-container">Loading campaign…</span></div></div>
+            <div class="mt-5"><div class="flex justify-between text-[11px] font-semibold uppercase"><span>Progress</span><span id="campaign-control-count">0 leads</span></div><div class="h-1.5 mt-2 rounded-full bg-surface-container-high overflow-hidden"><div id="campaign-control-progress" class="h-full bg-primary transition-all" style="width:0%"></div></div></div>
+            <div id="campaign-control-message" class="mt-5 rounded-lg border border-outline-variant bg-surface-container-low px-4 py-3 text-xs text-on-surface-variant" role="status">Loading campaign state…</div>
+            <div id="campaign-control-error" class="hidden mt-3 rounded-lg border border-error/40 bg-error/5 px-4 py-3 text-xs text-error" role="alert"></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                <button id="campaign-control-start" class="px-4 py-2.5 rounded-lg bg-primary text-on-primary text-xs font-bold disabled:opacity-50" onclick="window.campaignControlStart()">Start Campaign</button>
+                <button id="campaign-control-stop" class="px-4 py-2.5 rounded-lg border border-error text-error text-xs font-bold disabled:opacity-50" onclick="window.campaignControlStop()">Stop Campaign</button>
+                <button class="px-4 py-2.5 rounded-lg border border-outline-variant text-xs font-semibold" onclick="window.campaignControlLoadFile()">Load File</button>
+                <button id="campaign-control-reanalyze" class="px-4 py-2.5 rounded-lg border border-outline-variant text-xs font-semibold disabled:opacity-50" onclick="window.campaignControlReanalyze()">Re-analyze All</button>
+                <button id="campaign-control-clear" class="px-4 py-2.5 rounded-lg border border-error/50 text-error text-xs font-semibold disabled:opacity-50" onclick="window.campaignControlClear()">Clear All</button>
+            </div>
+            <div class="mt-5 pt-5 border-t border-surface-container"><label for="campaign-control-gap" class="block text-xs font-bold uppercase">Pause between calls (seconds)</label><p class="text-[11px] text-on-surface-variant mt-1">Saved to the backend for the current campaign role.</p><div class="flex gap-2 mt-3"><input id="campaign-control-gap" type="number" min="0" max="1200" value="5" class="w-24 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm"><button id="campaign-control-gap-save" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold" onclick="window.campaignControlSaveGap()">Save</button></div></div>
+            <div class="mt-5 pt-5 border-t border-surface-container"><h3 class="text-xs font-bold uppercase">Outbound phone numbers</h3><p class="text-[11px] text-on-surface-variant mt-1">Live configured lines for the selected role.</p><div id="campaign-control-phones" class="mt-3 grid gap-2"><div class="rounded-lg bg-surface-container-low px-4 py-3 text-xs text-on-surface-variant">Loading phone lines…</div></div><div id="campaign-control-rate" class="mt-3 text-[11px] text-on-surface-variant"></div></div>
+        </section>
+
+        <!-- ── Sandbox Tab Selector ── -->
+        <div class="bg-surface rounded-xl border border-surface-container shadow-ambient p-4">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-widest">Select Sandbox</span>
+                <span id="campaign-sandbox-info" class="text-xs font-semibold text-primary">P1,P2 (Cold) &middot; P3 (Digital)</span>
+            </div>
+            <div class="grid grid-cols-4 gap-3">
+                <button class="camp-tab active" data-sandbox="1" onclick="window.selectCampaignTab(1)">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+                        <span class="text-sm font-bold text-on-surface">Sandbox 1</span>
+                    </div>
+                    <span class="text-[10px] text-on-surface-variant block text-left">First-Touch &amp; Callbacks</span>
+                    <span class="text-[10px] text-primary font-semibold block text-left mt-1" id="camp-tab-count-1">0 leads</span>
+                </button>
+                <button class="camp-tab" data-sandbox="2" onclick="window.selectCampaignTab(2)">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+                        <span class="text-sm font-bold text-on-surface">Sandbox 2</span>
+                    </div>
+                    <span class="text-[10px] text-on-surface-variant block text-left">Retry Engine</span>
+                    <span class="text-[10px] text-secondary font-semibold block text-left mt-1" id="camp-tab-count-2">0 leads</span>
+                </button>
+                <button class="camp-tab" data-sandbox="3" onclick="window.selectCampaignTab(3)">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-2.5 h-2.5 rounded-full bg-tertiary"></span>
+                        <span class="text-sm font-bold text-on-surface">Sandbox 3</span>
+                    </div>
+                    <span class="text-[10px] text-on-surface-variant block text-left">Nurture &amp; Blue Loop</span>
+                    <span class="text-[10px] text-tertiary font-semibold block text-left mt-1" id="camp-tab-count-3">0 leads</span>
+                </button>
+                <button class="camp-tab" data-sandbox="4" onclick="window.selectCampaignTab(4)">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-2.5 h-2.5 rounded-full bg-outline-variant"></span>
+                        <span class="text-sm font-bold text-on-surface">Sandbox 4</span>
+                    </div>
+                    <span class="text-[10px] text-on-surface-variant block text-left">Post-Visit Feedback</span>
+                    <span class="text-[10px] text-on-surface-variant font-semibold block text-left mt-1" id="camp-tab-count-4">0 leads</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Campaign List (default) ── -->
+        <div id="campaign-list-panel">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-headline-md font-headline-md text-on-surface">Sandbox <span id="campaign-sb-title">1</span> Campaigns</h2>
+                    <p class="text-xs text-on-surface-variant mt-0.5" id="campaign-sb-desc">Fresh outreach to new leads — dials P1,P2 for Cold, P3 for Digital</p>
+                </div>
+                <button class="px-5 py-2.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-all shadow-sm" onclick="window.showCampaignForm()">
+                    + New outbound campaign
+                </button>
+            </div>
+            <div class="overflow-x-auto border border-outline-variant rounded-lg">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-surface-container-low border-b border-surface-container">
+                            <th class="p-3 text-xs font-bold text-on-surface-variant uppercase">Campaign Name</th>
+                            <th class="p-3 text-xs font-bold text-on-surface-variant uppercase">Sources</th>
+                            <th class="p-3 text-xs font-bold text-on-surface-variant uppercase">Total Leads</th>
+                            <th class="p-3 text-xs font-bold text-on-surface-variant uppercase">Pending</th>
+                            <th class="p-3 text-xs font-bold text-on-surface-variant uppercase">Called</th>
+                            <th class="p-3 text-xs font-bold text-on-surface-variant uppercase">Status</th>
+                            <th class="p-3 text-xs font-bold text-on-surface-variant uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="campaign-list-body" class="text-xs">
+                        <tr><td colspan="7" class="p-3 text-center text-on-surface-variant">Loading campaigns…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── New Campaign Form (Outpero-style) ── -->
+        <div id="campaign-form-panel" style="display:none;">
+            <div class="flex items-center gap-3 mb-6">
+                <button class="text-on-surface-variant hover:text-on-surface transition-colors" onclick="window.showCampaignList()">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <h2 id="campaign-form-title" class="text-headline-md font-headline-md text-on-surface">New outbound campaign</h2>
+            </div>
+
+            <div class="bg-surface rounded-lg p-6 border border-surface-container shadow-ambient flex flex-col gap-6">
+
+                <!-- Campaign Name -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Campaign Name <span class="text-error">*</span></label>
+                    <input id="camp-name" type="text" class="w-full bg-surface border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="e.g. Cold Lead Feedback Q2">
+                </div>
+
+                <!-- Lead Type: Cold vs Digital -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Lead Type <span class="text-error">*</span></label>
+                    <div class="flex gap-3" id="camp-source-type">
+                        <button type="button" data-source="campaign" class="camp-source-btn flex-1 px-4 py-3 rounded-lg text-sm font-semibold border-2 border-primary bg-primary/10 text-primary transition-all">
+                            <span class="material-symbols-outlined text-base align-middle mr-1">phone</span>
+                            Cold Calling
+                            <span class="block text-[10px] opacity-70 mt-0.5">Sandbox 1.1 · P1/P2 isolated cold queue</span>
+                        </button>
+                        <button type="button" data-source="digital" class="camp-source-btn flex-1 px-4 py-3 rounded-lg text-sm font-semibold border-2 border-outline-variant text-on-surface-variant hover:border-primary/50 transition-all">
+                            <span class="material-symbols-outlined text-base align-middle mr-1">campaign</span>
+                            Digital Leads
+                            <span class="block text-[10px] opacity-70 mt-0.5">Sandbox 1.2 · P3 automatic Excel queue</span>
+                        </button>
+                    </div>
+                    <p class="text-xs text-on-surface-variant mt-1">Determines which phone line dials this campaign: <strong>P1/P2</strong> for Cold, <strong>P3</strong> for Digital.</p>
+                </div>
+
+                <div id="digital-sheets-automation" class="border border-primary/30 bg-primary/5 rounded-xl p-4" style="display:none;">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <span class="text-sm font-semibold text-on-surface">Connect to Google Sheets</span>
+                            <p class="text-xs text-on-surface-variant mt-1">Three isolated broker sheets feed the unified Digital Leads queue. Valid new rows are deduplicated and called immediately through P3.</p>
+                        </div>
+                        <span id="digital-sheets-status" class="text-xs font-semibold text-on-surface-variant">Checking…</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
+                        <button type="button" data-broker-card="1" class="text-left rounded-lg border border-outline-variant p-3 text-xs hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" onclick="window.showBrokerSheetPopup(1)" disabled><strong>Broker 1</strong><br><span id="broker-1-status" class="text-on-surface-variant">Checking…</span></button>
+                        <button type="button" data-broker-card="2" class="text-left rounded-lg border border-outline-variant p-3 text-xs hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" onclick="window.showBrokerSheetPopup(2)" disabled><strong>Broker 2</strong><br><span id="broker-2-status" class="text-on-surface-variant">Checking…</span></button>
+                        <button type="button" data-broker-card="3" class="text-left rounded-lg border border-outline-variant p-3 text-xs hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" onclick="window.showBrokerSheetPopup(3)" disabled><strong>Broker 3</strong><br><span id="broker-3-status" class="text-on-surface-variant">Checking…</span></button>
+                    </div>
+                    <button type="button" class="mt-3 px-4 py-2 border border-primary text-primary rounded-lg text-xs font-semibold hover:bg-primary/10" onclick="window.copyDigitalSheetsSetup()">Copy Apps Script setup</button>
+                </div>
+
+                <div id="broker-sheet-popup" class="fixed inset-0 z-[90] bg-black/40 items-center justify-center p-4" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="broker-sheet-popup-title" onclick="if(event.target===this) window.closeBrokerSheetPopup()">
+                    <div class="bg-surface rounded-xl border border-outline-variant shadow-xl p-5 w-full max-w-md">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 id="broker-sheet-popup-title" class="text-lg font-semibold text-on-surface">Broker Sheet</h3>
+                                <p id="broker-sheet-popup-message" class="text-sm text-on-surface-variant mt-1">Open the connected Google Sheet.</p>
+                            </div>
+                            <button type="button" class="text-on-surface-variant hover:text-on-surface" onclick="window.closeBrokerSheetPopup()" aria-label="Close broker sheet popup"><span class="material-symbols-outlined">close</span></button>
+                        </div>
+                        <div class="flex justify-end gap-2 mt-5">
+                            <button type="button" class="px-4 py-2 border border-outline-variant rounded-lg text-sm font-semibold" onclick="window.closeBrokerSheetPopup()">Cancel</button>
+                            <button id="broker-sheet-open-btn" type="button" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-sm font-semibold" onclick="window.openSelectedBrokerSheet()">Open Google Sheet</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Concurrent Call Limit -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Concurrent Call Limit</label>
+                    <select id="camp-concurrent" class="w-full bg-surface border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none">
+                        <option value="1">1 call</option>
+                        <option value="2" selected>2 calls</option>
+                        <option value="3">3 calls</option>
+                        <option value="4">4 calls</option>
+                        <option value="5">5 calls</option>
+                    </select>
+                </div>
+
+                <!-- Calling Window -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Calling window</label>
+                    <div class="flex items-center gap-3">
+                        <input id="camp-window-start" type="time" value="11:00" class="bg-surface border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none">
+                        <span class="text-on-surface-variant">to</span>
+                        <input id="camp-window-end" type="time" value="19:30" class="bg-surface border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none">
+                    </div>
+                    <p class="text-xs text-on-surface-variant mt-1">24h format — e.g. 11:00 to 19:30 (IST). Only dials between these hours. Both empty = dial anytime.</p>
+                </div>
+
+                    <div class="flex items-center gap-3 mt-2">
+                        <button id="camp-window-save" type="button" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold disabled:opacity-50" onclick="window.saveCampaignWindow()">Save calling window</button>
+                        <span id="camp-window-status" class="text-xs text-on-surface-variant" role="status">Default: 11:00–19:30 IST</span>
+                    </div>
+
+                <!-- Skip opted-out numbers -->
+                <div class="flex items-center justify-between border border-outline-variant rounded-lg p-4">
+                    <div>
+                        <span class="text-sm font-semibold text-on-surface">Skip opted-out numbers</span>
+                        <p class="text-xs text-on-surface-variant mt-0.5">Never dial numbers on your do-not-call list</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input id="camp-skip-opted" type="checkbox" checked class="sr-only peer">
+                        <div class="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:bg-primary peer-focus:ring-2 peer-focus:ring-primary transition-all after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                    </label>
+                </div>
+
+                <!-- Calling Days -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-2">Calling days</label>
+                    <div class="flex gap-2" id="camp-days">
+                        <button type="button" data-day="1" class="camp-day-btn w-10 h-10 rounded-full text-xs font-bold border border-outline-variant bg-primary text-on-primary transition-all" onclick="this.classList.toggle('bg-primary');this.classList.toggle('text-on-primary');this.classList.toggle('bg-surface');this.classList.toggle('text-on-surface-variant');this.classList.toggle('border-outline-variant');this.classList.toggle('border-primary')">Mon</button>
+                        <button type="button" data-day="2" class="camp-day-btn w-10 h-10 rounded-full text-xs font-bold border border-outline-variant bg-primary text-on-primary transition-all" onclick="this.classList.toggle('bg-primary');this.classList.toggle('text-on-primary');this.classList.toggle('bg-surface');this.classList.toggle('text-on-surface-variant');this.classList.toggle('border-outline-variant');this.classList.toggle('border-primary')">Tue</button>
+                        <button type="button" data-day="3" class="camp-day-btn w-10 h-10 rounded-full text-xs font-bold border border-outline-variant bg-primary text-on-primary transition-all" onclick="this.classList.toggle('bg-primary');this.classList.toggle('text-on-primary');this.classList.toggle('bg-surface');this.classList.toggle('text-on-surface-variant');this.classList.toggle('border-outline-variant');this.classList.toggle('border-primary')">Wed</button>
+                        <button type="button" data-day="4" class="camp-day-btn w-10 h-10 rounded-full text-xs font-bold border border-outline-variant bg-primary text-on-primary transition-all" onclick="this.classList.toggle('bg-primary');this.classList.toggle('text-on-primary');this.classList.toggle('bg-surface');this.classList.toggle('text-on-surface-variant');this.classList.toggle('border-outline-variant');this.classList.toggle('border-primary')">Thu</button>
+                        <button type="button" data-day="5" class="camp-day-btn w-10 h-10 rounded-full text-xs font-bold border border-outline-variant bg-primary text-on-primary transition-all" onclick="this.classList.toggle('bg-primary');this.classList.toggle('text-on-primary');this.classList.toggle('bg-surface');this.classList.toggle('text-on-surface-variant');this.classList.toggle('border-outline-variant');this.classList.toggle('border-primary')">Fri</button>
+                        <button type="button" data-day="6" class="camp-day-btn w-10 h-10 rounded-full text-xs font-bold border border-outline-variant bg-primary text-on-primary transition-all" onclick="this.classList.toggle('bg-primary');this.classList.toggle('text-on-primary');this.classList.toggle('bg-surface');this.classList.toggle('text-on-surface-variant');this.classList.toggle('border-outline-variant');this.classList.toggle('border-primary')">Sat</button>
+                        <button type="button" data-day="0" class="camp-day-btn w-10 h-10 rounded-full text-xs font-bold border border-outline-variant bg-primary text-on-primary transition-all" onclick="this.classList.toggle('bg-primary');this.classList.toggle('text-on-primary');this.classList.toggle('bg-surface');this.classList.toggle('text-on-surface-variant');this.classList.toggle('border-outline-variant');this.classList.toggle('border-primary')">Sun</button>
+                    </div>
+                    <p class="text-xs text-on-surface-variant mt-1">Dials any selected day of the week.</p>
+                </div>
+
+                <!-- Holidays -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Holidays — never call on</label>
+                    <div class="flex gap-2">
+                        <input id="camp-holiday-date" type="date" class="flex-1 bg-surface border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none">
+                        <button type="button" class="px-4 py-2 border border-outline-variant rounded-lg text-sm font-semibold hover:bg-surface-container-high transition-all" onclick="window.addHoliday()">Add</button>
+                    </div>
+                    <div id="camp-holidays-list" class="flex flex-wrap gap-2 mt-2"></div>
+                </div>
+
+                <!-- Skip recently-called numbers -->
+                <div class="flex items-center justify-between border border-outline-variant rounded-lg p-4">
+                    <div>
+                        <span class="text-sm font-semibold text-on-surface">Skip recently-called numbers</span>
+                        <p class="text-xs text-on-surface-variant mt-0.5">Don't dial a number any of your campaigns already called in the last N days.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input id="camp-skip-days" type="number" min="0" max="30" value="0" class="w-20 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm text-center focus:ring-2 focus:ring-primary focus:outline-none">
+                        <span class="text-xs text-on-surface-variant">days</span>
+                    </div>
+                </div>
+
+                <!-- ── Contact List ── -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Contact List <span class="text-error">*</span></label>
+                    <p class="text-xs text-on-surface-variant mb-3" id="camp-contact-count">0 ready — phones in any format; bare 10-digit numbers treated as India (+91); duplicates skipped on launch.</p>
+
+                    <!-- Upload Area -->
+                    <div class="border-2 border-dashed border-outline-variant rounded-xl p-6 mb-4 text-center hover:border-primary/50 transition-colors" id="camp-drop-zone">
+                        <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">cloud_upload</span>
+                        <p class="text-sm font-semibold text-on-surface mb-1">Upload Excel or CSV</p>
+                        <p class="text-xs text-on-surface-variant mb-3">Drag &amp; drop or click to browse — supports .xlsx, .xls, .csv</p>
+                        <label class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-all cursor-pointer">
+                            <span class="material-symbols-outlined text-base">upload_file</span>
+                            Choose File
+                            <input id="camp-file-input" type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="window.importCampaignCSV(this)">
+                        </label>
+                        <p id="upload-status-msg" class="text-xs text-on-surface-variant mt-3"></p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="px-4 py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high transition-all" onclick="window.showAddContact()">Add Contact</button>
+                        <button type="button" class="px-4 py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high transition-all" onclick="window.showPasteContacts()">Paste</button>
+                        <button type="button" class="px-4 py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high transition-all" onclick="window.loadCampaignContacts()">Refresh</button>
+                    </div>
+
+                    <!-- Source Management -->
+                    <div class="bg-surface-container-low rounded-lg p-4 border border-surface-container mb-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Uploaded Sources</span>
+                            <button type="button" class="text-error text-xs font-semibold hover:underline flex items-center gap-1" onclick="window.deleteAllSources()">
+                                <span class="material-symbols-outlined text-sm">delete_sweep</span>
+                                Remove All &amp; Re-upload
+                            </button>
+                        </div>
+                        <div id="camp-sources-list" class="flex flex-wrap gap-2">
+                            <span class="text-xs text-on-surface-variant">No sources loaded.</span>
+                        </div>
+                    </div>
+
+                    <!-- Add Contact Inline Form -->
+                    <div id="camp-add-contact" class="flex gap-2 mb-3" style="display:none;">
+                        <input id="camp-contact-phone" type="text" class="flex-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:outline-none" placeholder="Phone number (e.g. +919876543210)">
+                        <input id="camp-contact-name" type="text" class="flex-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:outline-none" placeholder="Name (optional)">
+                        <button type="button" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:opacity-90" onclick="window.addSingleContact()">Add</button>
+                        <button type="button" class="px-3 py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high" onclick="document.getElementById('camp-add-contact').style.display='none'">✕</button>
+                    </div>
+
+                    <!-- Paste Contacts Modal -->
+                    <div id="camp-paste-panel" class="mb-3" style="display:none;">
+                        <textarea id="camp-paste-text" rows="4" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:outline-none" placeholder="Paste contacts: one per line, format: phone,name&#10;e.g.&#10;+919876543210,Rahul&#10;+919880123456,Ritika"></textarea>
+                        <div class="flex gap-2 mt-2">
+                            <button type="button" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:opacity-90" onclick="window.pasteContacts()">Import</button>
+                            <button type="button" class="px-3 py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high" onclick="document.getElementById('camp-paste-panel').style.display='none'">Cancel</button>
+                        </div>
+                    </div>
+
+                     <!-- Contact Table -->
+                     <div class="overflow-x-auto border border-outline-variant rounded-lg max-h-[300px] overflow-y-auto">
+                         <table class="w-full text-left border-collapse">
+                             <thead class="sticky top-0 bg-surface-container-low">
+                                 <tr>
+                                     <th class="p-2 text-xs font-bold text-on-surface-variant uppercase">Phone Number</th>
+                                     <th class="p-2 text-xs font-bold text-on-surface-variant uppercase">Name</th>
+                                     <th class="p-2 text-xs font-bold text-on-surface-variant uppercase">Status</th>
+                                     <th class="p-2 text-xs font-bold text-on-surface-variant uppercase">Call Date</th>
+                                 </tr>
+                             </thead>
+                             <tbody id="camp-contacts-body" class="text-xs">
+                                 <tr><td colspan="4" class="p-3 text-center text-on-surface-variant">No contacts yet — Add / Import / Paste above.</td></tr>
+                             </tbody>
+                         </table>
+                     </div>
+                </div>
+
+                <!-- Auto-Retry -->
+                <div class="border border-outline-variant rounded-lg p-4">
+                    <span class="text-sm font-semibold text-on-surface block mb-2">Auto-Retry for Unanswered Calls</span>
+                    <p class="text-xs text-on-surface-variant mb-3">Automatically retry contacts that don't pick up (busy / no-answer / failed).</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-on-surface-variant uppercase mb-1">How many retries per contact</label>
+                            <input id="camp-retry-count" type="number" min="1" max="9" value="2" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                            <p class="text-[10px] text-on-surface-variant mt-0.5">1–9. Each unanswered contact is re-dialed up to this many times.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-on-surface-variant uppercase mb-1">When to retry</label>
+                            <select id="camp-retry-when" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                <option value="next_day">The next day</option>
+                                <option value="same_run">Same run</option>
+                            </select>
+                            <p class="text-[10px] text-on-surface-variant mt-0.5">"Same run" keeps trying within this campaign; "next day" spreads retries to the following day's window.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schedule -->
+                <div class="border border-outline-variant rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-on-surface">Schedule Campaign for Later</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="camp-schedule-toggle" type="checkbox" class="sr-only peer" onchange="document.getElementById('camp-schedule-fields').style.display = this.checked ? 'block' : 'none'">
+                            <div class="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:bg-primary peer-focus:ring-2 peer-focus:ring-primary transition-all after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </label>
+                    </div>
+                    <p class="text-xs text-on-surface-variant mb-2">Start this campaign at a specific date & time instead of now.</p>
+                    <div id="camp-schedule-fields" style="display:none;">
+                        <input id="camp-schedule-datetime" type="datetime-local" class="w-full bg-surface border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Repeat -->
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Repeat this campaign</label>
+                    <p class="text-xs text-on-surface-variant mb-2">Re-dial the same contacts on a schedule. Each run finishes, then the next is queued automatically.</p>
+                    <div class="flex gap-2">
+                        <button type="button" class="camp-repeat-btn px-4 py-2 rounded-lg text-xs font-bold border border-primary bg-primary text-on-primary" data-repeat="one_time" onclick="window.setRepeatType('one_time')">One-time</button>
+                        <button type="button" class="camp-repeat-btn px-4 py-2 rounded-lg text-xs font-bold border border-outline-variant text-on-surface-variant" data-repeat="daily" onclick="window.setRepeatType('daily')">Daily</button>
+                        <button type="button" class="camp-repeat-btn px-4 py-2 rounded-lg text-xs font-bold border border-outline-variant text-on-surface-variant" data-repeat="weekly" onclick="window.setRepeatType('weekly')">Weekly</button>
+                    </div>
+                </div>
+
+                <!-- Launch -->
+                <div class="flex justify-end pt-2">
+                    <button id="camp-launch-btn" type="button" class="px-8 py-3 bg-primary text-on-primary rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed" onclick="window.launchCampaign()">
+                        Launch Outbound Campaign
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+     <!-- VIEW: MAKE A CALL -->
+     <div id="view-make-a-call" class="p-page-margin flex flex-col gap-section-gap max-w-[900px] mx-auto w-full" style="display:none;">
+         <div class="bg-surface rounded-lg p-6 border border-surface-container shadow-ambient flex flex-col gap-5">
+             <h2 class="text-headline-md font-headline-md text-on-surface border-b border-surface-container pb-4">Make a Call</h2>
+             
+             <!-- Dial Form -->
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                     <label class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Contact Name (optional)</label>
+                     <input id="dial-name-input" type="text" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2.5 text-body-sm focus:ring-1 focus:ring-primary focus:outline-none" placeholder="e.g. Technopolis">
+                 </div>
+                 <div>
+                     <label class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Phone Number <span class="text-error">*</span></label>
+                     <div class="flex gap-2">
+                         <input id="dial-phone-input" type="text" class="flex-1 bg-surface border border-outline-variant rounded-lg px-3 py-2.5 text-body-sm focus:ring-1 focus:ring-primary focus:outline-none" placeholder="+919876543210" value="">
+                         <button id="dial-action-btn" class="px-6 py-2.5 bg-primary text-on-primary rounded-lg font-bold text-xs hover:opacity-90 transition-all shadow-sm" onclick="window.placeRealCall()">
+                             Dial Now
+                         </button>
+                     </div>
+                 </div>
+             </div>
+
+             <!-- Active Call Panel -->
+             <div id="active-call-panel" class="border-2 border-primary/30 rounded-xl p-5 bg-surface-container" style="display:none;">
+                 <div class="flex items-center justify-between mb-4">
+                     <div class="flex items-center gap-2">
+                         <span id="manual-call-status-dot" class="w-3 h-3 rounded-full bg-primary pulse-active"></span>
+                         <span id="manual-call-status-title" class="text-sm font-bold text-on-surface">CALL IN PROGRESS</span>
+                     </div>
+                     <span class="text-xs font-mono text-on-surface-variant" id="call-slot-label">Vobiz line</span>
+                 </div>
+                 <div id="call-result-body" class="text-sm text-on-surface-variant bg-surface rounded-lg p-3" style="min-height:60px;">
+                     Dialing and analyzing transcript…
+                 </div>
+             </div>
+
+             <!-- Call Disposition Result (shown after call completes) -->
+             <div id="call-disposition-panel" class="border border-outline-variant rounded-xl p-5" style="display:none;">
+                 <h3 class="text-sm font-bold text-on-surface mb-3">Call Outcome</h3>
+                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                     <button class="dispo-btn p-3 rounded-lg border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all text-center" data-dispo="interested" onclick="window.setCallDisposition('interested')">
+                         <span class="material-symbols-outlined text-2xl text-tertiary mb-1">thumb_up</span>
+                         <span class="text-xs font-bold text-on-surface block">Interested</span>
+                     </button>
+                     <button class="dispo-btn p-3 rounded-lg border border-outline-variant hover:border-secondary hover:bg-secondary/5 transition-all text-center" data-dispo="callback" onclick="window.setCallDisposition('callback')">
+                         <span class="material-symbols-outlined text-2xl text-secondary mb-1">phone_callback</span>
+                         <span class="text-xs font-bold text-on-surface block">Callback</span>
+                     </button>
+                     <button class="dispo-btn p-3 rounded-lg border border-outline-variant hover:border-error hover:bg-error/5 transition-all text-center" data-dispo="not_interested" onclick="window.setCallDisposition('not_interested')">
+                         <span class="material-symbols-outlined text-2xl text-error mb-1">thumb_down</span>
+                         <span class="text-xs font-bold text-on-surface block">Not Interested</span>
+                     </button>
+                     <button class="dispo-btn p-3 rounded-lg border border-outline-variant hover:border-tertiary hover:bg-tertiary/5 transition-all text-center" data-dispo="site_visit" onclick="window.setCallDisposition('site_visit')">
+                         <span class="material-symbols-outlined text-2xl text-tertiary mb-1">location_on</span>
+                         <span class="text-xs font-bold text-on-surface block">Site Visit</span>
+                     </button>
+                 </div>
+                 <div id="dispo-status" class="text-xs text-on-surface-variant"></div>
+             </div>
+
+             <!-- Recent Calls -->
+             <div class="mt-2">
+                 <div class="flex items-center justify-between border-b border-surface-container pb-2 mb-3">
+                     <span class="text-xs font-bold text-on-surface-variant uppercase">Recent Manual Calls</span>
+                     <button class="text-primary font-semibold hover:underline text-xs" onclick="window.loadRecentManualCalls()">Refresh</button>
+                 </div>
+                 <div id="recent-manual-calls-body" class="flex flex-col gap-2 max-h-[300px] overflow-y-auto">
+                     <span class="text-xs text-on-surface-variant">Loading…</span>
+                 </div>
+             </div>
+
+             <div id="manual-call-detail-modal" class="fixed inset-0 z-[100] bg-black/55 items-center justify-center p-4" style="display:none" onclick="if(event.target===this) window.closeManualCallDetail()">
+                 <div class="bg-surface rounded-2xl border border-outline-variant shadow-2xl w-full max-w-3xl max-h-[88vh] overflow-y-auto p-6">
+                     <div class="flex justify-between items-start gap-4 mb-5">
+                         <div><h3 id="manual-detail-title" class="text-xl font-bold">Manual call details</h3><p id="manual-detail-sub" class="text-xs text-on-surface-variant mt-1"></p></div>
+                         <button class="px-3 py-1.5 rounded-lg border border-outline-variant" onclick="window.closeManualCallDetail()">Close</button>
+                     </div>
+                     <div class="grid md:grid-cols-2 gap-4">
+                         <div class="rounded-xl bg-surface-container-low p-4"><div class="text-xs font-bold uppercase mb-2">Outcome</div><p id="manual-detail-summary" class="text-sm whitespace-pre-wrap"></p></div>
+                         <div class="rounded-xl bg-surface-container-low p-4"><div class="text-xs font-bold uppercase mb-2">Recording</div><audio id="manual-detail-audio" controls preload="metadata" class="w-full"></audio><p id="manual-detail-recording-status" class="text-xs text-on-surface-variant mt-2"></p></div>
+                     </div>
+                     <div class="rounded-xl bg-surface-container-low p-4 mt-4"><div class="text-xs font-bold uppercase mb-2">Conversation transcript</div><pre id="manual-detail-transcript" class="text-xs whitespace-pre-wrap font-sans max-h-80 overflow-y-auto"></pre></div>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+    <!-- VIEW: CONFIGURATION -->
+    <div id="view-config" class="p-page-margin flex flex-col gap-6 w-full" style="display:none;">
+        <!-- Header -->
+        <div class="flex items-end justify-between">
+            <div>
+                <h2 class="text-headline-lg font-headline-lg text-on-surface tracking-tight">Configuration</h2>
+                <p class="text-body-sm text-on-surface-variant mt-1">Agent prompt, knowledge base &amp; greeting for <strong id="config-role-label">sales_1</strong></p>
+            </div>
+            <button class="px-6 py-2.5 bg-primary text-on-primary rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md" onclick="window.saveConfigSettings()">
+                Save Changes
+            </button>
+        </div>
+
+        <!-- Two-column grid: System Prompt + Greeting/KB -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            <!-- System Prompt (left, wider) -->
+            <div class="lg:col-span-3 bg-surface rounded-xl p-6 border border-surface-container shadow-ambient flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-headline-sm font-headline-sm text-on-surface">System Prompt</h3>
+                        <p class="text-[11px] text-on-surface-variant mt-0.5">Personality, behavior rules, conversation logic</p>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest bg-surface-container-highest text-on-surface-variant px-2.5 py-1 rounded-full">Active</span>
+                </div>
+                <textarea id="config-prompt" class="flex-1 min-h-[560px] w-full bg-surface-container-lowest border border-surface-container rounded-xl px-4 py-3 text-body-sm font-mono leading-relaxed resize-none focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Loading saved agent instructions from backend..."></textarea>
+            </div>
+
+            <!-- Right column: Greeting + Knowledge Base -->
+            <div class="lg:col-span-2 flex flex-col gap-5">
+                <!-- Greeting -->
+                <div class="bg-surface rounded-xl p-5 border border-surface-container shadow-ambient">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-body-md font-bold text-on-surface">Greeting &amp; opening audio</h3>
+                            <p class="text-[10px] text-on-surface-variant mt-0.5">Text for the opening line spoken by Gemini Live</p>
+                        </div>
+                    </div>
+                    <textarea id="config-greeting" class="w-full h-[90px] bg-surface-container-lowest border border-surface-container rounded-xl px-4 py-3 text-body-sm resize-none focus:ring-2 focus:ring-primary focus:outline-none" placeholder="First line for this role..."></textarea>
+                    <p class="text-[10px] text-on-surface-variant mt-2"><strong>Save</strong> stores greeting text that the AI speaks on every call.</p>
+                </div>
+
+                <!-- Knowledge Base -->
+                <div class="bg-surface rounded-xl p-5 border border-surface-container shadow-ambient flex-1 flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-body-md font-bold text-on-surface">Knowledge Base</h3>
+                            <p class="text-[10px] text-on-surface-variant mt-0.5">RAG grounding — agent reads this on every call</p>
+                        </div>
+                        <label class="px-3 py-1.5 bg-primary text-on-primary rounded-full text-[10px] font-bold cursor-pointer hover:opacity-90 transition-all" title="Upload documents (PDF, DOCX, TXT, MD, CSV, XLSX)">
+                            <input type="file" id="rag-file-input" multiple accept=".pdf,.docx,.txt,.md,.markdown,.csv,.xlsx,.json" class="hidden" onchange="window.uploadRagDocs(this.files)">
+                            Upload
+                        </label>
+                    </div>
+                    <textarea id="config-rag" class="flex-1 min-h-[280px] w-full bg-surface-container-lowest border border-surface-container rounded-xl px-4 py-3 text-body-sm font-mono leading-relaxed resize-none focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Business intelligence, product info, pricing, FAQs&#10;&#10;Tip: drop multiple files or upload documents above"></textarea>
+                    <div class="flex items-center justify-between mt-3 px-3 py-2 bg-surface-container-low rounded-lg">
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Status</span>
+                        <span id="rag-status-label" class="text-[10px] font-extrabold uppercase tracking-widest text-primary">READY</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaign Cases -->
+        <div class="bg-surface rounded-xl p-6 border border-surface-container shadow-ambient">
+            <div class="flex items-start justify-between flex-wrap gap-3 mb-4">
+                <div>
+                    <h3 class="text-headline-sm font-headline-sm text-on-surface">Campaign Cases</h3>
+                    <p class="text-[11px] text-on-surface-variant mt-0.5 max-w-[560px]">Define named campaigns (e.g. "April Steel Sheets Push", "Diwali Discount Drive") and tick the one running today. The active case's instructions are appended to the agent prompt on every call.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="cases-active-pill" class="text-[10px] font-extrabold uppercase tracking-widest bg-surface-container-highest text-on-surface-variant px-2.5 py-1 rounded-full">No active case</span>
+                    <button class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 transition-all" onclick="window.openCaseModal()">+ New Case</button>
+                </div>
+            </div>
+            <div id="cases-list" class="flex flex-col gap-3">
+                <div class="text-sm text-on-surface-variant text-center py-6 border border-dashed border-surface-container rounded-xl">Loading cases…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ────────── MODAL: New / Edit Case ────────── -->
+    <div id="modal-case" class="modal-overlay" onclick="if(event.target===this)window.closeModal('modal-case')" style="display:none;">
+        <div class="modal-box max-w-md" onclick="event.stopPropagation()">
+            <div class="p-5 border-b border-surface-container flex justify-between items-center bg-surface-container-low">
+                <h3 id="case-modal-title" class="text-lg font-bold text-on-surface">New Campaign Case</h3>
+                <button class="text-on-surface-variant hover:bg-surface-container p-1 rounded-full transition-colors" onclick="window.closeModal('modal-case')">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-5 flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Case Name</label>
+                    <input id="case-name-input" type="text" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="e.g. Diwali Discount Drive">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Description (appended to prompt)</label>
+                    <textarea id="case-desc-input" rows="4" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none resize-none" placeholder="Instructions for this campaign..."></textarea>
+                </div>
+            </div>
+            <div class="p-4 border-t border-surface-container bg-surface-container-low flex justify-end gap-3">
+                <button class="px-4 py-2 border border-outline-variant rounded-lg text-xs font-bold hover:bg-surface-container-high" onclick="window.closeModal('modal-case')">Cancel</button>
+                <button id="case-save-btn" class="px-5 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 transition-all" onclick="window.saveCase()">Save Case</button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- ────────── MODAL: KPI Detail (Reusable) ────────── -->
+<div id="modal-kpi-detail" class="modal-overlay" onclick="if(event.target===this)closeKpiModal()">
+    <div class="modal-box max-w-4xl" onclick="event.stopPropagation()">
+        <!-- Header -->
+        <div class="p-5 border-b border-surface-container flex justify-between items-center bg-surface-container-low">
+            <div>
+                <h3 id="kdi-title" class="text-lg font-bold text-on-surface">KPI Details</h3>
+                <p id="kdi-meta" class="text-xs text-on-surface-variant">Loading details...</p>
+            </div>
+            <button class="text-on-surface-variant hover:bg-surface-container p-1 rounded-full transition-colors flex items-center justify-center" onclick="closeKpiModal()">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <!-- Summary Row -->
+        <div id="kdi-summary" class="p-5 flex gap-4 flex-wrap border-b border-surface-container bg-surface-container-lowest">
+            <!-- populated by kpi_modal.js -->
+        </div>
+        <!-- Filters Bar -->
+        <div class="p-4 border-b border-surface-container flex flex-wrap items-center justify-between gap-4 bg-surface-container-low">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Search:</span>
+                <input id="kdi-search" type="text" placeholder="Search name/phone/company..." class="px-3 py-1.5 bg-surface border border-outline-variant rounded-md text-xs w-48 focus:ring-1 focus:ring-primary focus:outline-none">
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Date:</span>
+                <select id="kdi-filter-date" class="px-3 py-1.5 bg-surface border border-outline-variant rounded-md text-xs focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer">
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                </select>
+            </div>
+        </div>
+        <!-- Table -->
+        <div class="overflow-x-auto max-h-[380px] overflow-y-auto">
+            <table class="w-full text-left border-collapse">
+                <thead id="kdi-thead" class="sticky top-0 z-10 bg-surface-container-low border-b border-surface-container text-on-surface-variant">
+                    <!-- populated by kpi_modal.js -->
+                </thead>
+                <tbody id="kdi-tbody">
+                    <!-- populated by kpi_modal.js -->
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination -->
+        <div id="kdi-pagination" class="p-4 border-t border-surface-container bg-surface-container-low flex justify-between items-center text-xs">
+            <!-- populated by kpi_modal.js -->
+        </div>
+    </div>
+</div>
+
+<!-- ────────── MODAL: Call Transcript Dialogue & QA ────────── -->
+<div id="modal-call-transcript" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-call-transcript')">
+    <div class="modal-box max-w-2xl" onclick="event.stopPropagation()">
+        <!-- Header -->
+        <div class="p-5 border-b border-surface-container flex justify-between items-center bg-surface-container-low">
+            <div>
+                <h3 id="transcript-modal-title" class="text-lg font-bold text-on-surface">Call Detail</h3>
+                <p id="transcript-modal-subtitle" class="text-xs text-on-surface-variant">Phone & status</p>
+            </div>
+            <button class="text-on-surface-variant hover:bg-surface-container p-1 rounded-full transition-colors flex items-center justify-center" onclick="closeModal('modal-call-transcript')">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <!-- Body -->
+        <div class="p-5 overflow-y-auto flex flex-col gap-4 max-h-[70vh]">
+            <!-- Audio recording player if available -->
+            <div id="transcript-rec-player" class="p-3 bg-surface-container rounded-lg border border-outline-variant" style="display:none;">
+                <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Listen to Call Recording</span>
+                <audio id="transcript-audio-player" controls class="w-full focus:outline-none"></audio>
+            </div>
+
+            <!-- Post-call QA insights -->
+            <div class="bg-surface-container-low border border-surface-container rounded-lg p-4 flex flex-col gap-3">
+                <h4 class="text-sm font-bold text-on-surface border-b border-surface-container pb-1.5">Gemini Post-Call Analysis (QA)</h4>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Duration</span>
+                        <span id="qa-duration" class="text-body-sm font-semibold text-on-surface">—</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Disposition</span>
+                        <span id="qa-disposition" class="text-body-sm font-semibold text-on-surface">—</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Call Summary & Remarks</span>
+                    <p id="qa-summary" class="text-body-sm text-on-surface bg-surface-container-lowest p-2 border border-outline-variant rounded mt-1"></p>
+                </div>
+            </div>
+
+            <!-- Live voice dialogues -->
+            <div class="flex flex-col gap-2">
+                <h4 class="text-sm font-bold text-on-surface border-b border-surface-container pb-1.5">Voice Call Transcript</h4>
+                <div id="transcript-chat-container" class="transcript-container">
+                    <!-- Chat bubbles injected here -->
+                </div>
+            </div>
+        </div>
+        <div class="p-4 border-t border-surface-container bg-surface-container-low flex justify-end">
+            <button class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:opacity-90 transition-colors shadow-sm" onclick="closeModal('modal-call-transcript')">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ────────── MODAL: Standard Audio Player ────────── -->
+<div id="modal-audio-player" class="modal-overlay" onclick="if(event.target===this)window.closeAudioPlayer()">
+    <div class="modal-box max-w-md" onclick="event.stopPropagation()">
+        <div class="p-5 border-b border-surface-container flex justify-between items-center bg-surface-container-low">
+            <h3 id="audio-modal-title" class="text-sm font-bold text-on-surface">Call Recording</h3>
+            <button class="text-on-surface-variant hover:bg-surface-container p-1 rounded-full transition-colors flex items-center justify-center" onclick="window.closeAudioPlayer()">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="p-6 flex flex-col items-center gap-4 bg-surface-container-lowest">
+            <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary pulse-active">
+                <span class="material-symbols-outlined text-3xl">play_arrow</span>
+            </div>
+            <audio id="audio-player-tag" controls class="w-full focus:outline-none"></audio>
+        </div>
+    </div>
+</div>
+
+<div id="toast-host" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Scripts loading -->
+<script src="app.js?v=2"></script>
+<script src="kpi_modal.js"></script>
+</body>
+</html>

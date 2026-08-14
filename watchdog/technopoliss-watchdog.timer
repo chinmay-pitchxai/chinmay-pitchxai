@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Technopoliss self-healing watchdog every 60 seconds
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=60s
+AccuracySec=5s
+RandomizedDelaySec=10s
+Unit=technopoliss-watchdog.service
+
+[Install]
+WantedBy=timers.target
