@@ -1,0 +1,14 @@
+# Technopoliss public entrypoint — TLS/WSS terminator.
+srv1732329.hstgr.cloud {
+    reverse_proxy technopoliss:9090
+
+    header {
+        -Server
+        X-Backend technopoliss
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+backend/.venv/
+.pytest_cache/
+.hermes/
+
+# Environments / secrets (NEVER push these)
+.env
+*.env
+.env.*
+!.env.example
+backend/.env
+
+# Runtime data & customer PII
+backend/data/
+data/
+backend/media/
+backend/openwa/
+backend/static/brochures/
+
+# Logs / temp
+*.log
+*.bak
+*.pcm
+*.db
+*.sqlite
+*.sqlite3
+tmp/
+graphify-out/
+*.tar.gz
+
+# Node
+node_modules/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.opencode/
+
+# Dev artifacts
+*.png
+screenshot.jpg
+
+# Business documents (not for public repo)
+whatsapp details needs to shair/

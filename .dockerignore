@@ -1,0 +1,48 @@
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+backend/.venv
+backend/data
+backend/openwa
+.pytest_cache
+
+# Logs
+*.log
+debug-*.log
+runtime.*.log
+
+# IDE
+.idea
+.vscode
+.opencode
+
+# Git
+.git
+.gitignore
+
+# Temp
+tmp/
+/tmp
+
+# Media / large files
+screenshot.jpg
+*.png
+
+# Docs
+AUDIT_REPORT.md
+REAL_ESTATE_CALLING_PIPELINE_PLAN.md
+IDEA.md
+
+# Old
+whatsapp details needs to shair
+wipe_vps.sh
+graphify-out
+
+# Node (if any)
+node_modules

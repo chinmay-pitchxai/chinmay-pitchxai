@@ -1,0 +1,153 @@
+# Production stack for srv1732329.hstgr.cloud (187.127.177.149)
+# Backend (FastAPI, port 9090) + Caddy TLS reverse proxy for public HTTPS/WSS.
+#
+#   VOBIZ_PUBLIC_BASE_URL / VOBIZ_STREAM_PUBLIC_BASE_URL  -> https://<CADDY_HOST>
+#   Vobiz POSTs /vobiz/answer there; the XML points the audio
+#   <Stream> to wss://<CADDY_HOST>/ws/vobiz, which Caddy forwards to the backend.
+
+version: "3.8"
+
+x-backend-env: &backend-env
+  HOST: 0.0.0.0
+  PORT: 9090
+  VERN_DATA_DIR: /app/backend/data
+  # Gemini + Vobiz credentials and every runtime setting come from backend/.env
+  ENV_FILE_GUARD: "1"
+
+services:
+  technopoliss:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: technopoliss-vernika
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Internal only — Caddy is the only public entrypoint (also gives us WSS/TLS).
+    networks:
+      - appnet
+    env_file:
+      - ./backend/.env
+    environment: *backend-env
+    # The VPS hostname resolves to 127.0.1.1 inside containers (host /etc/hosts),
+    # which breaks the app's own "is the public webhook reachable?" probe. Pin it
+    # to the Docker host gateway so the backend can reach Caddy on this host.
+    extra_hosts:
+      - "srv1732329.hstgr.cloud:host-gateway"
+    volumes:
+      - ./backend/data:/app/backend/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # WhatsApp gateway — OpenWA (linked-device WhatsApp API). Powers the 24/7
+  # WhatsApp chatbot. Reached by the backend at http://openwa:2786. Sessions,
+  # sqlite DB and media persist on the host via ./backend/openwa/data.
+  openwa:
+    build:
+      context: ./backend/openwa
+      dockerfile: Dockerfile
+    container_name: openwa-api
+    restart: unless-stopped
+    networks:
+      - appnet
+    # The VPS hostname resolves to 127.0.1.1 inside containers (host /etc/hosts),
+    # which breaks OpenWA's webhook delivery + remote media fetch to the public
+    # URL. Pin it to the Docker host gateway so OpenWA can reach Caddy.
+    extra_hosts:
+      - "srv1732329.hstgr.cloud:host-gateway"
+    env_file:
+      - ./backend/openwa/.env
+    environment:
+      - PORT=2786
+      - NODE_ENV=production
+      - DATABASE_TYPE=sqlite
+      - DATABASE_NAME=./data/openwa.sqlite
+      - DATABASE_SYNCHRONIZE=true
+      - DATABASE_LOGGING=false
+      - ENGINE_TYPE=whatsapp-web.js
+      - SESSION_DATA_PATH=./data/sessions
+      - PUPPETEER_HEADLESS=true
+      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=./data/media
+      - REDIS_ENABLED=false
+      - REDIS_BUILTIN=false
+      - QUEUE_ENABLED=false
+      - CACHE_ENABLED=false
+      - POSTGRES_BUILTIN=false
+      - MINIO_BUILTIN=false
+      - AUTO_START_SESSIONS=true
+      - WEBHOOK_TIMEOUT=10000
+      - WEBHOOK_RETRY_DELAY=5000
+      - SSRF_ALLOWED_HOSTS=srv1732329.hstgr.cloud
+      - WWEBJS_WEB_VERSION=2.3000.1040641150-alpha
+    volumes:
+      - ./backend/openwa/data:/app/data
+    ports:
+      - "127.0.0.1:2786:2786"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2786/api/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # PostgreSQL — primary database (replaces SQLite for production).
+  postgres:
+    image: postgres:16-alpine
+    container_name: technopoliss-postgres
+    restart: unless-stopped
+    networks:
+      - appnet
+    environment:
+      POSTGRES_DB: technopoliss
+      POSTGRES_USER: technopoliss
+      POSTGRES_PASSWORD: technopoliss
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U technopoliss -d technopoliss"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # TLS/WSS terminator — issues a Let's Encrypt cert for <host> automatically.
+  # Set CADDY_HOST + your DNS A record accordingly (or edit rules below for the IP).
+  caddy:
+    image: caddy:2.7-alpine
+    container_name: technopoliss-caddy
+    restart: unless-stopped
+    depends_on:
+      - technopoliss
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - appnet
+    environment:
+      # The public hostname Vobiz + your browser should use.
+      CADDY_HOST: ${CADDY_HOST:-srv1732329.hstgr.cloud}
+      UPSTREAM: technopoliss:9090
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      # Static Caddyfile (compose configs/content mangles {$VAR} Caddy syntax).
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+
+configs: {}
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+
+networks:
+  appnet:
+    driver: bridge
