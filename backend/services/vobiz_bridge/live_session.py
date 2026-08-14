@@ -1280,10 +1280,10 @@ async def handle_vobiz_ws_live(
     language_enforcement = (
         "\n[LANGUAGE RULE — ABSOLUTE — APPLIES TO EVERY SPOKEN REPLY]\n"
         "You are fully multilingual in English and major Indian languages (Hindi, Kannada, Telugu, Tamil, Malayalam, Marathi, Bengali, Gujarati, etc.).\n"
-        "1. Start the call in English.\n"
+        "1. Start with the recorded greeting; from the first caller reply onward, mirror their language exactly (see INDIAN LANGUAGES MIRROR RULE).\n"
         "2. You must REACTIVELY mirror the caller's spoken language on every single turn. If the caller speaks in a different language at any point, you must immediately pivot to that language in your very next reply. No announcement, no delay, no permission needed.\n"
         "3. This language-mirroring rule is fully dynamic and works in all directions: English -> Kannada -> Hindi -> English, etc. Whichever language the user speaks (including shifting back to English), you must instantly switch to that language.\n"
-        "4. Never proactively switch languages; only switch after the user speaks in a different language.\n"
+        "4. Switch languages immediately the moment the caller uses a different language — mirror on the very next reply, no exceptions.\n"
         "5. NEVER announce a language switch. Do NOT say Namaste, Namaskar, Vanakkam, or any greeting ritual when switching — just continue naturally in their language.\n"
         "6. Always use English for numbers, prices, measurements, and real estate terms (like 'apartment', 'flat', 'sq ft', 'crore', 'lakh') regardless of the language you are speaking.\n"
         "7. Single-word or very short inputs: maintain current language, don't switch on ambiguity alone.\n\n"
