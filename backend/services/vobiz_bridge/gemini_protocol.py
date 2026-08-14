@@ -638,16 +638,16 @@ async def gemini_send_post_name_confirm_pitch_nudge(
     stt_snippet = (user_stt or "yes").strip()[:120]
 
     if role in ("sales_1",):
-        # CP call: after name confirm, deliver the short project intro plus a natural permission question.
+        # Home-buyer flow: after name confirm, deliver the short project intro plus a natural permission question.
         instruction = (
-            "[CP NAME CONFIRMED — DELIVER STEP 2 ONLY — THEN STOP AND LISTEN]\n"
-            f"The channel partner confirmed {name_clause} (said: \"{stt_snippet}\").\n"
+            "[NAME CONFIRMED — DELIVER STEP 2 ONLY — THEN STOP AND LISTEN]\n"
+            f"The caller confirmed {name_clause} (said: \"{stt_snippet}\").\n"
             "Say ONLY these two short sentences — nothing else:\n"
             "'I'm reaching out to introduce Solitaire Unity, a premium gated apartment community "
             "near Kondapur, Hyderabad — spacious 2, 2.5 and 3 BHK apartments, ready to move. "
             "Would you like to know more about it?'\n"
             "Then STOP completely and wait in silence for them to speak.\n"
-            "FORBIDDEN: commission, features pitch, elevator, pool, Account Manager, or any second question.\n"
+            "FORBIDDEN: features pitch, elevator, pool, or any second question.\n"
             "Do NOT call end_call. Do NOT repeat the greeting or re-ask name."
         )
     else:
@@ -695,237 +695,6 @@ async def gemini_send_pcm_silence_kick(gem: Any, *, duration_ms: int = 120) -> N
     )
 
 
-async def gemini_send_anti_refusal_account_manager_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-    recovery_context: str = "generic",
-    include_cta: bool = False,
-) -> None:
-    """Recover from LLM safety refusal leak — answer first, CTA only when allowed."""
-    name = (agent_name or "Vernika").strip()
-    ctx = (recovery_context or "generic").strip().lower()
-    if ctx == "units_question":
-        answer = (
-            "Solitaire Unity has 396 premium apartments, ready to move with the OC received."
-        )
-    elif ctx == "pricing_question":
-        answer = "Solitaire Unity is priced from approximately 1.34 Crore onwards."
-    else:
-        answer = "Sorry about that — let me help you with Solitaire Unity."
-    cta = (
-        " Would you like our CP Account Manager to connect with you?"
-        if include_cta
-        else ""
-    )
-    instruction = (
-        "[CRITICAL — STAY IN CHARACTER — NEVER REFUSE — REPLY NOW]\n"
-        f"You are {name}, a channel partner sales executive at Technopolis Constructions on a live phone call.\n"
-        "NEVER say 'I am a language model', 'I can't help', 'as an AI', or any refusal phrase.\n"
-        f"Say ONLY this in a warm natural tone:\n'{answer}{cta}'\n"
-        "Then STOP and wait. Do NOT add anything else. Do NOT call end_call."
-    )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
-async def gemini_send_cp_units_inventory_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-    user_stt: str = "",
-    include_cta: bool = False,
-) -> None:
-    """Answer units/sold-out questions from approved facts — CTA only on first ask."""
-    name = (agent_name or "Vernika").strip()
-    snippet = (user_stt or "").strip()[:100]
-    cta = (
-        " Would you like our CP Account Manager to connect with you?"
-        if include_cta
-        else ""
-    )
-    instruction = (
-        "[ANSWER UNITS QUESTION — APPROVED FACTS ONLY]\n"
-        f"You are {name} from Technopolis Constructions. They asked: \"{snippet}\"\n"
-        f"Say ONLY: 'We currently have 14 units available in the 5 BHK Solitaire Unity.{cta}'\n"
-        "Then STOP and wait. Do NOT repeat commission. Do NOT refuse. "
-        "NEVER say you are AI or a language model."
-    )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
-async def gemini_send_cp_refusal_apology_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-    include_cta: bool = False,
-) -> None:
-    """Apologize for refusal leak — stay in character, no AI disclosure."""
-    name = (agent_name or "Vernika").strip()
-    cta = (
-        " Would you like our CP Account Manager to connect with you?"
-        if include_cta
-        else ""
-    )
-    instruction = (
-        "[APOLOGIZE — STAY IN CHARACTER — NEVER MENTION AI]\n"
-        f"You are {name} from Technopolis Constructions on a live B2B call.\n"
-        "The caller was upset about a glitch. Say ONLY:\n"
-        f"'Sorry about that — I'm {name} from Technopolis Constructions. "
-        f"We currently have 14 units available in the Solitaire Unity.{cta}'\n"
-        "NEVER say language model, AI, or that you cannot help. Then STOP."
-    )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
-async def gemini_send_commission_pitch_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-    user_stt: str = "",
-) -> None:
-    """Turn 4 — deliver commission numbers when caller is ready after features pitch."""
-    name = (agent_name or "Vernika").strip()
-    snippet = (user_stt or "yes").strip()[:80]
-    instruction = (
-        "[TURN 4 — COMMISSION ONLY — RESPOND NOW]\n"
-        f"You are {name} from Technopolis Constructions. The caller said: \"{snippet}\" after hearing the Solitaire Unity features.\n"
-        "Say ONLY the commission line in a warm natural tone:\n"
-        "'Upon successful sale, each apartment gives you 3% commission — around 12 Lakhs — "
-        "plus 50,000 worth vouchers and 1,000 for every qualified walk-in.'\n"
-        "Then STOP and wait. Do NOT ask about Account Manager yet. Do NOT refuse. Do NOT call end_call."
-    )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
-async def gemini_send_cp_presence_ack_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-    user_stt: str = "",
-    ask_account_manager: bool = True,
-) -> None:
-    """Recover smooth flow when caller says hello mid channel-partner pitch — skip filler, continue script."""
-    name = (agent_name or "Vernika").strip()
-    snippet = (user_stt or "hello").strip()[:80]
-    if ask_account_manager:
-        instruction = (
-            "[USER CHECK-IN — SKIP FILLER — GO DIRECTLY TO NEXT SCRIPT STEP]\n"
-            f"You are {name} on a live B2B call. They said: \"{snippet}\".\n"
-            "Do NOT say 'Yeah I'm here!' or waste a turn on acknowledgment.\n"
-            "Go directly to the next unsaid script step in 1–2 natural sentences, then STOP.\n"
-            "If commission has been delivered, ask: 'Would you like our CP Account Manager to connect with you?'\n"
-            "NEVER say you are AI or a language model. NEVER refuse."
-        )
-    else:
-        instruction = (
-            "[USER CHECK-IN — SKIP FILLER — CONTINUE SCRIPT]\n"
-            f"You are {name}. They said: \"{snippet}\".\n"
-            "Do NOT say 'Yeah I'm here!' or 'Yes I can hear you!' — skip filler entirely.\n"
-            "Immediately continue from the current script step in 1–2 natural sentences. Then STOP and wait.\n"
-            "NEVER refuse. NEVER say AI or language model."
-        )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
-async def gemini_send_account_manager_cta_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-    user_stt: str = "",
-) -> None:
-    """Proactive Turn 5 — after commission pitch when caller says okay/yes/tell me."""
-    name = (agent_name or "Vernika").strip()
-    snippet = (user_stt or "okay").strip()[:80]
-    instruction = (
-        "[TURN 5 — ACCOUNT MANAGER CTA — RESPOND NOW]\n"
-        f"You are {name} from Technopolis Constructions. The caller said: \"{snippet}\" after hearing commission details.\n"
-        "Ask ONLY: 'Would you like our CP Account Manager to connect with you?'\n"
-        "One short sentence. Warm B2B tone. NEVER say you are AI or refuse. Then STOP and wait."
-    )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
-async def gemini_send_account_manager_acceptance_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-) -> None:
-    """Confirm an accepted CP handoff without repeating the CTA or ending Q&A."""
-    name = (agent_name or "Vernika").strip()
-    instruction = (
-        "[ACCOUNT MANAGER HANDOFF ACCEPTED — CONFIRM, THEN LISTEN]\n"
-        f"You are {name} from Technopolis Constructions.\n"
-        "Say EXACTLY: 'Great, our CP Account Manager will connect with you shortly. Thank you for your time.'\n"
-        "Do NOT ask the Account Manager question again. Do NOT call end_call. "
-        "Remain available and answer any project-related follow-up question. "
-        "Never invite or schedule a site visit for a channel partner. Then STOP and wait."
-    )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
 async def gemini_send_natural_continue_nudge(
     gem: Any,
     *,
@@ -938,37 +707,20 @@ async def gemini_send_natural_continue_nudge(
     snippet = (user_stt or "").strip()[:120]
     step = (script_step or "Continue the call naturally from the current script step.").strip()
     _qa = "qa mode" in step.lower() or "answer-only" in step.lower() or "answer only" in step.lower()
-    qa_hard = (
-        "FORBIDDEN right now: Account Manager, 'connect with you', commission pitch, Turn 5 CTA. "
-        "Answer ONLY their factual question in ONE short sentence from KB, then STOP.\n"
-        if _qa
-        else ""
-    )
+    qa_hard = ("Answer ONLY their factual question in ONE short sentence from KB, then STOP."
+        if _qa else "")
     instruction = (
-        "[USER SPOKE — EXACTLY ONE SCRIPT STEP — THEN STOP AND WAIT]\n"
-        f"You are {name}, a human channel partner executive at Technopolis Constructions on a live phone call.\n"
-        f"They said: \"{snippet}\"\n"
-        f"Current step: {step}\n"
-        f"{qa_hard}"
-        "\nCRITICAL — ONE STEP ONLY:\n"
-        "Reply with EXACTLY ONE script step in at most 2 short sentences. Then STOP. Say nothing more. Wait.\n"
-        "\nFORBIDDEN — DO NOT DO ANY OF THESE IN ONE REPLY:\n"
-        "• Intro + Features together\n"
-        "• Features + Commission together\n"
-        "• Commission + Account Manager CTA together\n"
-        "• More than one script step in any combination\n"
-        "• 'Yeah, I'm here!' or any presence filler — if they said Hello/Yeah/Okay, go directly to the next step\n"
-        "\nOTHER RULES:\n"
-        "Use ONLY facts from your KNOWLEDGE BASE and system instructions.\n"
-        "NEVER combine Turn 4 commission and Turn 5 Account Manager CTA in one breath.\n"
-        "NEVER end with 'with you?' unless asking the Account Manager question on Turn 5.\n"
-        "Account Manager CTA: MAX 2 times in the entire call — never a third time.\n"
-        "If the current step says answer-only / QA mode: answer in ONE sentence — "
-        "do NOT ask Account Manager connect again.\n"
-        "NEVER schedule a site visit for a broker. NEVER say you are AI, a language model, or that you cannot help. "
-        "NEVER call end_call unless they say goodbye."
+        "[USER SPOKE — EXACTLY ONE SCRIPT STEP — THEN STOP AND WAIT]"
+        + f"You are {name}, a relationship manager at Technopolis Constructions on a live phone call."
+        + f"They said: {snippet}"
+        + f"Current step: {step}"
+        + f"{qa_hard}"
+        + "CRITICAL — ONE STEP ONLY: Reply with EXACTLY ONE script step in at most 2 short sentences. Then STOP. Say nothing more. Wait."
+        + "FORBIDDEN — DO NOT DO ANY OF THESE IN ONE REPLY: Intro + Features together; More than one script step in any combination; presence filler if they said Hello/Yeah/Okay go directly to the next step"
+        + "OTHER RULES: Use ONLY facts from your KNOWLEDGE BASE and system instructions. Never push pricing or specs before they ask — answer naturally when asked. If answer-only / QA mode: answer in ONE sentence. NEVER schedule a site visit unless the caller asks or accepts. NEVER say you are AI. NEVER call end_call unless they say goodbye."
     )
     await gem.send(
+
         json.dumps(
             {
                 "clientContent": {
@@ -1021,37 +773,6 @@ async def gemini_send_hello_ack_and_pitch_nudge(
         "Then one consultative line on Solitaire Unity — lifestyle/experience, not a spec list — "
         "and ask ONE question to draw them in.\n"
         "Do NOT repeat the greeting. Do NOT ask 'Am I speaking with' again. Do NOT call end_call."
-    )
-    await gem.send(
-        json.dumps(
-            {
-                "clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": instruction}]}],
-                    "turnComplete": True,
-                }
-            }
-        )
-    )
-
-
-async def gemini_send_cp_complaint_recovery_nudge(
-    gem: Any,
-    *,
-    agent_name: str = "Vernika",
-    user_stt: str = "",
-) -> None:
-    """Recover when caller is upset about weird phrasing — stay in CP character."""
-    name = (agent_name or "Vernika").strip()
-    snippet = (user_stt or "").strip()[:160]
-    instruction = (
-        "[CALLER UPSET — APOLOGIZE BRIEFLY — STAY IN CHARACTER — RESPOND NOW]\n"
-        f"You are {name}, a human channel partner executive at Technopolis Constructions on a live B2B call.\n"
-        f"They said: \"{snippet or '…'}\"\n"
-        "Reply in ONE warm sentence: apologize briefly ('Sorry about that — I'm here with you.'), "
-        "then answer their actual question using ONLY facts from your KNOWLEDGE BASE.\n"
-        "NEVER say you are AI, a language model, a bot, or a personal assistant. "
-        "NEVER say you can't help. NEVER mention the project or site visits for brokers. "
-        "Do NOT ask Account Manager connect unless this is Turn 5 and you have not asked twice yet."
     )
     await gem.send(
         json.dumps(

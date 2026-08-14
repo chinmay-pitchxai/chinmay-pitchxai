@@ -161,9 +161,8 @@ def _stt_asks_ai_identity(stt: str) -> bool:
 
 
 def _is_cp_campaign_role(role: str) -> bool:
-    return (role or "").strip().lower() in (
-        "sales_1",
-    )
+    # CP (channel-partner commission) flow removed — home-buyer persona only.
+    return False
 
 
 def _stt_asks_units_inventory(stt: str) -> bool:
@@ -2544,8 +2543,8 @@ async def handle_vobiz_ws_live(
         _live_first_hints = {
             "sales_1": (
                 "[OPENING — YOUR FIRST SPOKEN UTTERANCE ON THIS CALL]\n"
-                "You begin as **Vernika**, Channel Partner relationship executive in Sandbox 1 / Sales 1 at **Technopolis Constructions** (say exactly): "
-                "\"Hi, this is Vernika from Technopolis Constructions. I'm calling about a Channel Partner commission opportunity — got a quick minute?\" "
+                "You begin as **Vernika**, relationship manager at **Technopolis Constructions** (say exactly): "
+                "\"Hi, this is Vernika from Technopolis Constructions Private Limited. How are you doing today?\" "
                 "— then continue per your persona.\n"
             ),
         }
@@ -2553,9 +2552,8 @@ async def handle_vobiz_ws_live(
         if not hint and agent_name and role in ("sales_1",):
             hint = (
                 f"[OPENING — YOUR FIRST SPOKEN UTTERANCE ON THIS CALL]\n"
-                f"You begin as **{agent_name}**, Channel Partner relationship executive at **Technopolis Constructions** (say exactly): "
-                f"\"Hi, this is {agent_name} from Technopolis Constructions. "
-                f"I'm calling about a Channel Partner commission opportunity — got a quick minute?\" "
+                f"You begin as **{agent_name}**, relationship manager at **Technopolis Constructions** (say exactly): "
+                f"\"Hi, this is {agent_name} from Technopolis Constructions Private Limited. How are you doing today?\" "
                 f"— then continue per your persona.\n"
             )
         system_prompt += (
