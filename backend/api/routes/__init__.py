@@ -1,0 +1,17 @@
+from .health import router as health_router
+from .ui import router as ui_router
+from .vobiz import router as vobiz_router
+from .web_voice import router as web_voice_router
+from .campaign import router as campaign_router
+from .console_api import router as console_router
+from .cases import router as cases_router
+from .schedules import router as schedules_router
+from .auth_api import router as auth_router
+from .whatsapp import router as whatsapp_router
+from .whatsapp_proxy import router as whatsapp_proxy_router
+from .callbacks import router as callbacks_router
+from .events import router as events_router
+from .orchestration import router as orchestration_router
+from .sandbox_overview import router as sandbox_overview_router
+from .dashboard import router as dashboard_router
+from mcp_server import router as mcp_router
