@@ -1,0 +1,22 @@
+# Bridge server — Vobiz WebSocket ↔ Gemini Live
+fastapi==0.109.2
+uvicorn==0.27.0
+python-dotenv==1.0.0
+httpx==0.25.2
+websockets==12.0
+numpy==1.26.4
+pydantic==2.6.4
+# Standard library on Python <3.13; PyPI shim on 3.13+ where ``audioop`` was removed.
+audioop-lts==0.2.1; python_version >= "3.13"
+miniaudio==1.59
+aiofiles==23.2.1
+python-multipart==0.0.6
+loguru==0.7.2
+PyJWT==2.8.0
+bcrypt==4.1.2
+slowapi==0.1.9
+openpyxl
+xlrd
+rapidfuzz==3.9.7
+tzdata; platform_system == "Windows"
+psycopg2-binary==2.9.9
