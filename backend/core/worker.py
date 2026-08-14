@@ -3455,6 +3455,17 @@ async def _schedule_failed_call_retry(role: str, lead_id: int, lead_phone: str, 
         import datetime as _dt
         from services.callback_time import zoneinfo_safe as _zsafe
 
+        # Campaign "When to retry" setting: 'same_run' retries within this run
+        # after a short delay; 'next_day' (default) keeps the same-clock-time
+        # +N×24h anchor behavior below.
+        retry_when = "next_day"
+        try:
+            from core.state import get_state
+            _cfg = (get_state(role).get("campaign_config") or {})
+            retry_when = str(_cfg.get("retry_when") or _cfg.get("auto_retry_when") or "next_day").lower()
+        except Exception:
+            pass
+
         _IST = _zsafe(settings.transcript_callback_tz)
         anchor_dt = _dt.datetime.fromtimestamp(anchor_epoch, tz=_IST)
         retry_dt = anchor_dt + _dt.timedelta(hours=retry_hours * next_retry_count)
@@ -3462,6 +3473,10 @@ async def _schedule_failed_call_retry(role: str, lead_id: int, lead_phone: str, 
 
         if campaign_live and rest_retry_enabled() and role in ("sales_1",):
             retry_epoch = time.time() + failed_retry_delay_sec()
+        elif retry_when in ("same_run", "same run", "same-run"):
+            # Same-run retry: fire again after the inter-call rest delay so the
+            # contact gets a second chance inside today's window.
+            retry_epoch = time.time() + max(60.0, failed_retry_delay_sec())
 
         _hr = retry_dt.hour + retry_dt.minute / 60.0
         if _hr >= 19.5 or _hr < 9.5:
@@ -4444,7 +4459,7 @@ async def check_gemini_health() -> dict:
     fallbacks = [
         "gemini-flash-latest",
         "gemini-3-flash-preview",
-        (settings.gemini_call_analysis_model or "gemini-2.5-flash").strip(),
+        (settings.gemini_call_analysis_model or "gemini-3.1-flash-lite").strip(),
     ]
     models: list[str] = []
     for m in fallbacks:
@@ -4860,8 +4875,8 @@ async def _scheduler_loop():
                         continue
                     text = (
                         f"Hi {lead_name}, hope you had a chance to go through the Solitaire Unity "
-                        "brochure and videos we shared. Would you be interested in buying a villa here, "
-                        "or scheduling a site visit? We'd be happy to help — just reply here on WhatsApp."
+                        "brochure and videos we shared. Would you be interested in knowing more about "
+                        "the project, or scheduling a site visit? We'd be happy to help — just reply here on WhatsApp."
                     )
                     logger.info("Sending WhatsApp polite reminder to lead_id={} ({})", lead_id, phone)
                     try:

@@ -6,9 +6,11 @@ import re
 
 
 _ROLE_FALLBACK_GREETINGS = {
-    # Technopolis / Vernika — Solitaire Unity (single active role).
+    # Technopolis — Solitaire Unity (single active role). The agent NAME is
+    # interpolated from the operator's saved prompt (extract_agent_name), so
+    # the AI never introduces itself with a stale hardcoded name.
     "sales_1": (
-        "Hi, this is Vernika from Technopolis Constructions Private Limited."
+        "Hi, this is {agent_name} from Technopolis Constructions Private Limited."
     ),
 }
 
@@ -52,6 +54,19 @@ def _interpolate_company(text: str, company: str) -> str:
 
 
 def build_opening_line(row_data: dict, role: str = "sales_1") -> str:
-    # Static opening line for pre-recorded greeting playout
+    # Opening line for the outbound greeting, personalized with the lead's
+    # first name / company when available. The agent name comes from the
+    # operator's saved prompt — never a hardcoded persona.
     r = (role or "sales_1").strip().lower()
-    return _ROLE_FALLBACK_GREETINGS.get(r) or _ROLE_FALLBACK_GREETINGS["sales_1"]
+    text = _ROLE_FALLBACK_GREETINGS.get(r) or _ROLE_FALLBACK_GREETINGS["sales_1"]
+    try:
+        from prompts.role_prompts import extract_agent_name
+
+        agent_name = extract_agent_name(r) or "Vernika"
+        text = text.replace("{agent_name}", agent_name)
+    except Exception:
+        text = text.replace("{agent_name}", "Vernika")
+    row_data = row_data or {}
+    text = _interpolate_first_name(text, str(row_data.get("name") or ""))
+    text = _interpolate_company(text, str(row_data.get("company") or ""))
+    return text

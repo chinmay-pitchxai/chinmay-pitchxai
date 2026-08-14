@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 
 from core.storage import _get_conn
@@ -43,8 +44,8 @@ async def execute_whatsapp_job(job: dict, _number: str | None) -> None:
             raise RuntimeError(f"WhatsApp package send failed: {exc}") from exc
         try:
             conn.execute(
-                "UPDATE leads SET whatsapp_sent=1,whatsapp_sent_at=datetime('now') WHERE id=?",
-                (job["lead_id"],),
+                "UPDATE leads SET whatsapp_sent=1,whatsapp_sent_at=? WHERE id=?",
+                (time.time(), job["lead_id"]),
             )
             conn.commit()
         except Exception:

@@ -83,6 +83,27 @@ def load_recorded_greeting_pcm(
                 matches = _greeting_meta_matches(meta, template_text, role=role)
         except Exception as err:
             logger.warning("Failed to check template text hash in load_recorded_greeting_pcm: {}", err)
+    if not matches and role:
+        # Narrow tolerance: accept a fresh intro-only capture only when its
+        # stored text is an intro-only variant of the SAME greeting (the
+        # campaign-opening vs template-text mismatch that historically caused
+        # a regeneration loop). If the user PASTED NEW greeting text, the hash
+        # differs -> we must re-record (never play stale audio for new text).
+        try:
+            from core.greeting_text_utils import intro_only_greeting
+            import json as _json
+
+            stored_text = str(meta.get("text") or "")
+            if stored_text:
+                want_intro = intro_only_greeting((greeting_text or "").strip())
+                if intro_only_greeting(stored_text) == want_intro:
+                    logger.info(
+                        "Greeting text hash differs but intro text matches for role={} — accepting",
+                        role,
+                    )
+                    matches = True
+        except Exception as _tol_err:
+            logger.debug("Greeting tolerance check skipped: {}", _tol_err)
     if greeting_text.strip() and not matches:
         logger.warning(
             "Greeting text changed for role={} (stored source={}) — discarding stale cache.",
@@ -141,6 +162,7 @@ def _write_greeting_cache_files(
         
     meta = {
         "text_hash": h,
+        "text": text,  # the exact text this audio speaks (used by tolerance check)
         "style_hash": _text_hash(style),
         "voice": voice,
         "sr": int(sr),
@@ -330,7 +352,18 @@ async def ensure_opening_pcm(
 
     from core.greeting_text_utils import intro_only_greeting
 
-    greet_text = intro_only_greeting((opening or "").strip())
+    # Canonical greeting for PRERECORDED audio: use the stable template text
+    # (resolved_greeting_text) so the capture hash matches what the live WS
+    # session loads at playback time. The campaign `opening` line (which may
+    # include the project name) is used only as a fallback — mixing the two
+    # caused a text-hash mismatch that rejected the freshly captured audio and
+    # forced a regeneration loop (audio never played).
+    try:
+        from core.state import resolved_greeting_text as _rgt
+
+        greet_text = intro_only_greeting(_rgt(role) or (opening or "").strip())
+    except Exception:
+        greet_text = intro_only_greeting((opening or "").strip())
     if not greet_text:
         try:
             from core.state import resolved_greeting_text

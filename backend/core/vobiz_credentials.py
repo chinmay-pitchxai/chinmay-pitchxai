@@ -74,5 +74,19 @@ def resolve_vobiz_credentials(
 
     auth_id = str(vc.get("auth_id") or settings.vobiz_auth_id or "").strip()
     auth_token = str(vc.get("auth_token") or settings.vobiz_auth_token or "").strip()
+
+    # Multi-account support: if a stored accounts[] list exists, the first
+    # (active) account wins over the legacy single fields.
+    accounts = vc.get("accounts") or []
+    if isinstance(accounts, list) and accounts:
+        first = accounts[0]
+        if isinstance(first, dict):
+            acc_id = str(first.get("auth_id") or "").strip()
+            acc_token = str(first.get("auth_token") or "").strip()
+            if acc_id:
+                auth_id = acc_id
+            if acc_token:
+                auth_token = acc_token
+
     from_number = resolve_outbound_from_number(role, vc)
     return auth_id, auth_token, from_number, public_url

@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from services.browser_voice_bridge import handle_browser_voice_ws
+
 router = APIRouter(tags=["voice"])
 
 

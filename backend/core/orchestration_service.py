@@ -18,6 +18,7 @@ PRIORITY = {
     JobType.INTERESTED_FOLLOWUP: 3,
     JobType.SITE_VISIT_REMINDER_DAY_BEFORE: 4,
     JobType.SITE_VISIT_REMINDER_MORNING: 4,
+    JobType.SITE_VISIT_RESCHEDULE: 4,
     JobType.POST_VISIT_FEEDBACK: 5, JobType.FRESH_CALL: 6,
     JobType.WHATSAPP_PACKAGE: 3, JobType.WHATSAPP_FOLLOWUP_24H: 3,
 }
@@ -26,6 +27,16 @@ PRIORITY = {
 def _phone(raw: str) -> str:
     digits = re.sub(r"\D", "", raw or "")
     return digits[-10:] if len(digits) >= 10 else digits
+
+
+def _set_sandbox(conn: sqlite3.Connection, lead_id: int, sandbox: int) -> None:
+    """Best-effort sync of the lead's sandbox column (dashboard signal)."""
+    try:
+        from core.storage import _update_lead_sandbox_sync
+
+        _update_lead_sandbox_sync(int(lead_id), int(sandbox))
+    except Exception:
+        pass
 
 
 def _lead(conn: sqlite3.Connection, lead_id: int) -> sqlite3.Row:
@@ -100,6 +111,8 @@ def failed_call(conn: sqlite3.Connection, *, lead_id: int, source: str,
     due = add_working_hours(ended_at, wait_hours)
     conn.execute("UPDATE leads SET lifecycle_status='failed_retry_waiting' WHERE id=?", (lead_id,))
     conn.commit()
+    # Plan flowchart: failed call hands off to Sandbox 2 (Retry Engine, P4-P6).
+    _set_sandbox(conn, lead_id, 2)
     return schedule_job(
         conn, lead_id=lead_id, job_type=JobType.FAILED_RETRY, source=source,
         due_at=due, key=f"retry:{lead_id}:{retry_cycle}:{next_attempt}",
@@ -126,6 +139,9 @@ def schedule_callback(conn, *, lead_id: int, source: str, due_at: datetime, reas
         (lead_id,),
     )
     conn.execute("UPDATE leads SET lifecycle_status='callback_requested' WHERE id=?", (lead_id,)); conn.commit()
+    # Plan flowchart: scheduled callbacks dial back through Sandbox 1 lines
+    # (P1/P2 cold, P3 digital).
+    _set_sandbox(conn, lead_id, 1)
     return schedule_job(
         conn, lead_id=lead_id, job_type=JobType.CALLBACK, source=source,
         due_at=due_at, key=f"callback:{lead_id}:{int(due_at.timestamp())}", payload={"reason": reason},
@@ -134,6 +150,9 @@ def schedule_callback(conn, *, lead_id: int, source: str, due_at: datetime, reas
 
 def interested(conn, *, lead_id: int, source: str, now: datetime, interest_cycle: str) -> tuple[int, int]:
     conn.execute("UPDATE leads SET lifecycle_status='interested' WHERE id=?", (lead_id,)); conn.commit()
+    # Plan flowchart: an Interested lead transitions immediately to Sandbox 3
+    # (Nurture & callbacks — P7/P8).
+    _set_sandbox(conn, lead_id, 3)
     package = schedule_job(
         conn, lead_id=lead_id, job_type=JobType.WHATSAPP_PACKAGE, source=source,
         due_at=now, key=f"wa-package:{lead_id}:{interest_cycle}", source_type="interest_cycle", source_id=interest_cycle,
@@ -149,6 +168,7 @@ def interested(conn, *, lead_id: int, source: str, now: datetime, interest_cycle
 def whatsapp_package_sent(conn, *, lead_id: int, source: str, sent_at: datetime, interest_cycle: str) -> int:
     """Schedule only the 24-working-hour follow-up after confirmed package delivery."""
     conn.execute("UPDATE leads SET lifecycle_status='interested' WHERE id=?", (lead_id,)); conn.commit()
+    _set_sandbox(conn, lead_id, 3)
     return schedule_job(
         conn, lead_id=lead_id, job_type=JobType.WHATSAPP_FOLLOWUP_24H, source=source,
         due_at=add_working_hours(sent_at, 24), key=f"wa-followup:{lead_id}:{interest_cycle}",

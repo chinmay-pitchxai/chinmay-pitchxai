@@ -136,6 +136,24 @@ NOT_INTERESTED_KEYWORDS = frozenset({
     "stop", "unsubscribe", "don't call",
 })
 
+# Negated visit requests must beat the VISIT keyword branch:
+# "we are NOT interested in a visit", "no site visit please".
+NEGATED_VISIT_PHRASES = (
+    "not interested in a visit", "not interested in visit", "not interested in the visit",
+    "no visit", "no site visit", "no site-visit", "no need to visit",
+    "don't want to visit", "dont want to visit", "don't wish to visit",
+    "not visiting", "won't visit", "wont visit", "will not visit",
+    "not coming", "can't come", "cant come", "no more visits",
+)
+
+# Strong positive visit intent — beats a leading "no" ("no, I DO want to visit").
+POSITIVE_VISIT_PHRASES = (
+    "want to visit", "would like to visit", "wish to visit", "yes visit",
+    "yes, visit", "yes i want", "yes i would", "please visit", "please schedule",
+    "please book", "i'll visit", "i will visit", "i'll come", "i will come",
+    "want to see", "would like to see", "yes please",
+)
+
 RESCHEDULE_KEYWORDS = frozenset({
     "reschedule", "change", "another", "different", "new date", "new time",
 })
@@ -160,6 +178,12 @@ def classify_reply(text: str) -> str:
     low = (text or "").strip().lower()
     if not low:
         return "unknown"
+    # Negation-aware: explicit "not interested in a visit" beats VISIT keywords.
+    if any(p in low for p in NEGATED_VISIT_PHRASES):
+        return "not_interested"
+    # Strong positive visit intent beats a leading "no" ("no, I DO want to visit").
+    if any(p in low for p in POSITIVE_VISIT_PHRASES):
+        return "interested"
     if any(k in low for k in NOT_INTERESTED_KEYWORDS):
         return "not_interested"
     if any(k in low for k in RESCHEDULE_KEYWORDS):

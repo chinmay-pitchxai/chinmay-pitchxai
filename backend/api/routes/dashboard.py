@@ -202,6 +202,17 @@ def _lead_payload(row: Any) -> dict:
             duration = int(parsed.get("call_duration_sec") or 0)
         except Exception:
             duration = 0
+    # Upload provenance: file uploads store the original filename in
+    # ``extra.upload_source``; Google Sheet broker rows store ``extra.broker_id``.
+    extra_obj = {}
+    extra_raw = lead.get("extra")
+    if extra_raw:
+        try:
+            parsed = json.loads(extra_raw) if isinstance(extra_raw, str) else extra_raw
+            if isinstance(parsed, dict):
+                extra_obj = parsed
+        except Exception:
+            extra_obj = {}
     return {
         "id": int(lead["id"]),
         "name": lead.get("name") or "",
@@ -211,6 +222,9 @@ def _lead_payload(row: Any) -> dict:
         "segment": lead.get("segment") or lead.get("source_file") or "",
         "source": lead.get("source") or "campaign",
         "role": lead.get("role") or "",
+        "upload_source": (extra_obj.get("upload_source") or lead.get("source_file") or ""),
+        "broker_id": extra_obj.get("broker_id") or "",
+        "extra": extra_obj,
         "status": (lead.get("status") or "pending").strip(),
         "disposition": _disposition(lead),
         "error": lead.get("error") or "—",
@@ -242,8 +256,8 @@ def _fetch_leads(limit: int, role: str = "") -> list[dict]:
         params.append(wanted_role)
     rows = conn.execute(
         f"""SELECT id, role, name, phone, email, company, status, analysis,
-                   error, start_time, created_at, whatsapp_sent,
-                   failed_call_retries, segment, source_file, sandbox, source, _log_id
+                  error, extra, start_time, created_at, whatsapp_sent,
+                  failed_call_retries, segment, source_file, sandbox, source, _log_id
             FROM leads {where}
             ORDER BY COALESCE(start_time, 0) DESC LIMIT ?""",
         tuple(params + [limit]),

@@ -80,7 +80,8 @@ def list_mcp_tools() -> dict[str, Any]:
                     "type": "object",
                     "properties": {
                         "phone_number": {"type": "string"},
-                        "sandbox": {"type": "integer"},
+                        "role": {"type": "string", "default": "sales_1"},
+                        "source": {"type": "string", "default": "campaign"},
                     },
                     "required": ["phone_number"],
                 },
@@ -107,6 +108,96 @@ def _sandbox_from_pool(pool_name: str) -> int:
     return 1
 
 
+def _lead_extra_dict(lead: dict) -> dict:
+    """``leads.extra`` is a JSON string in the DB — tolerate both shapes."""
+    raw = lead.get("extra")
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _lead_sandbox(lead: dict) -> int:
+    """Authoritative sandbox for a lead: explicit column > lifecycle stage."""
+    extra = _lead_extra_dict(lead)
+    try:
+        sb = int(extra.get("sandbox") or 0)
+        if 1 <= sb <= 4:
+            return sb
+    except (TypeError, ValueError):
+        pass
+    try:
+        from core.workflow_models import sandbox_for_stage
+
+        return int(sandbox_for_stage(str(lead.get("lifecycle_status") or "new")))
+    except Exception:
+        return 1
+
+
+def _queue_manual_call_sync(phone: str, role: str, source: str) -> dict[str, Any]:
+    import time
+    from datetime import datetime, timezone
+
+    from core.phone_norm import norm_phone_str
+    from core.dnc import is_phone_blocked
+    from core.orchestration_service import schedule_job
+    from core.workflow_models import JobType
+
+    normalized = norm_phone_str(phone)
+    if not normalized:
+        return {"status": "error", "detail": "invalid phone_number"}
+    if is_phone_blocked(normalized):
+        return {"status": "blocked", "phone_number": normalized, "detail": "number is on the do-not-contact list"}
+    # TRAI register (do_not_contact table) — keyed by last 10 digits like
+    # orchestration_service.opt_out. The operator dnc_list above is separate.
+    try:
+        _digits = "".join(ch for ch in normalized if ch.isdigit())
+        _dnc_key = _digits[-10:] if len(_digits) >= 10 else _digits
+        if _storage._get_conn().execute(
+            "SELECT 1 FROM do_not_contact WHERE normalized_phone=?", (_dnc_key,)
+        ).fetchone():
+            return {"status": "blocked", "phone_number": normalized, "detail": "number is on the do-not-contact list"}
+    except Exception:
+        pass
+    try:
+        conn = _storage._get_conn()
+        lead = _storage._find_lead_by_phone_any_role_sync(normalized)
+        if lead:
+            lead_id = int(lead["id"])
+        else:
+            lead_id = _storage._add_lead_sync(role=role, name="Lead", phone=normalized)
+            if lead_id <= 0:
+                return {"status": "blocked", "phone_number": normalized, "detail": "number is on the do-not-contact list"}
+        job_key = f"mcp-manual:{lead_id}:{int(time.time())}"
+        schedule_job(
+            conn,
+            lead_id=lead_id,
+            job_type=JobType.FRESH_CALL,
+            source=source,
+            due_at=datetime.now(timezone.utc),
+            key=job_key,
+            attempt=1,
+            source_type="mcp",
+            source_id=f"mcp:{normalized}",
+            payload={"manual": True, "role": role},
+        )
+        return {
+            "status": "enqueued",
+            "lead_id": lead_id,
+            "phone_number": normalized,
+            "job_key": job_key,
+        }
+    except PermissionError:
+        return {"status": "blocked", "phone_number": normalized, "detail": "lead is opted out"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
 @router.post("/call_tool")
 async def call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name == "get_lead_status":
@@ -121,7 +212,8 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             "lead_id": lead.get("id"),
             "name": lead.get("name"),
             "role": lead.get("role"),
-            "sandbox": _sandbox_from_pool(lead.get("extra", {}).get("eligible_pool")),
+            "sandbox": _lead_sandbox(lead),
+            "current_sandbox": _lead_sandbox(lead),
             "lead_status": lead.get("status"),
             "lifecycle_status": lead.get("lifecycle_status"),
             "disposition": lead.get("disposition"),
@@ -131,15 +223,83 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         phone = arguments.get("phone_number")
         if not phone:
             raise HTTPException(400, "phone_number required")
+        from core.phone_norm import norm_phone_str as _norm_mcp
+
+        normalized = _norm_mcp(phone)
+        if not normalized:
+            raise HTTPException(400, "Invalid phone_number — could not normalize to E.164.")
         role = "sales_1"
-        lead_id = await _storage.add_lead(
-            role=role,
-            name=str(arguments.get("name", "Lead")),
-            phone=phone,
+        source = str(arguments.get("source", "cold") or "cold").strip().lower()
+        if source == "digital_marketing":
+            source = "digital"
+        if source not in ("cold", "digital"):
+            source = "cold"
+        name = str(arguments.get("name", "Lead") or "Lead").strip()[:200] or "Lead"
+        budget = str(arguments.get("budget") or "").strip()
+        location = str(arguments.get("preferred_location") or "").strip()
+        ptype = str(arguments.get("property_type") or "").strip()
+        try:
+            sandbox_arg = int(arguments.get("sandbox") or 1)
+        except (TypeError, ValueError):
+            sandbox_arg = 1
+        # Leads may only enter through Sandbox 1 (outcome-driven downstream).
+        sandbox_arg = 1 if sandbox_arg not in (1, 2, 3, 4) else sandbox_arg
+        from core.storage import _bulk_add_leads_sync, _get_conn
+
+        extra: dict[str, str] = {}
+        if budget:
+            extra["budget"] = budget
+        if location:
+            extra["preferred_location"] = location
+        if ptype:
+            extra["property_type"] = ptype
+        extra["mcp_source"] = "create_lead"
+        saved, _dupes, dnc_blocked = await asyncio.to_thread(
+            _bulk_add_leads_sync, role, [{
+                "name": name, "phone": normalized, "source": source,
+                "sandbox": sandbox_arg, "extra": extra,
+            }]
         )
-        if lead_id <= 0:
+        if dnc_blocked:
             raise HTTPException(409, "Phone number is registered in the do-not-contact list")
-        return {"status": "created", "lead_id": lead_id, "phone_number": phone, "sandbox": 1}
+        conn = _get_conn()
+        row = conn.execute(
+            "SELECT id FROM leads WHERE role=? AND phone=? ORDER BY id DESC LIMIT 1",
+            (role, normalized),
+        ).fetchone()
+        if not row:
+            raise HTTPException(500, "Lead was not persisted")
+        lead_id = int(row[0])
+        # Plan Section 1.2: create_lead injects into the Sandbox 1 queue — the
+        # lead must receive a fresh_call job or the autonomous dispatcher will
+        # never dial it.
+        from datetime import datetime, timezone
+        from core.orchestration_service import schedule_job
+        from core.workflow_models import JobType
+
+        try:
+            schedule_job(
+                conn,
+                lead_id=lead_id,
+                job_type=JobType.FRESH_CALL,
+                source=source,
+                due_at=datetime.now(timezone.utc),
+                key=f"mcp-create:{normalized}",
+                attempt=1,
+                source_type="mcp",
+                source_id="create_lead",
+                payload={"sub_sandbox": "1.2" if source == "digital" else "1.1"},
+            )
+        except PermissionError:
+            raise HTTPException(409, "Phone number is registered in the do-not-contact list")
+        return {
+            "status": "created",
+            "lead_id": lead_id,
+            "phone_number": normalized,
+            "source": source,
+            "sandbox": 1,
+            "job_enqueued": "fresh_call",
+        }
 
     elif name == "get_call_history":
         phone = arguments.get("phone_number")
@@ -166,14 +326,12 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         }
 
     elif name == "trigger_manual_call":
-        phone = arguments.get("phone_number")
-        sandbox = arguments.get("sandbox", 1)
-        return {
-            "status": "queued",
-            "phone_number": phone,
-            "sandbox": sandbox,
-            "message": f"Manual call queued for {phone} on Sandbox {sandbox}.",
-        }
+        phone = str(arguments.get("phone_number", "") or "").strip()
+        if not phone:
+            return {"status": "error", "detail": "phone_number required"}
+        role = str(arguments.get("role", "sales_1") or "sales_1")
+        source = str(arguments.get("source", "campaign") or "campaign").lower()
+        return await asyncio.to_thread(_queue_manual_call_sync, phone, role, source)
 
     elif name == "get_weekly_report":
         backend_dir = Path(__file__).resolve().parent

@@ -347,7 +347,6 @@ class PostgresConnection:
 
         # PRAGMA statements are SQLite-specific maintenance no-ops on Postgres.
         if re.match(r"(?is)^\s*PRAGMA\b", sql):
-            from core.db import _NullCursor  # local to avoid forward ref
             return _NullCursor()
 
         # SQLite BEGIN IMMEDIATE / BEGIN EXCLUSIVE is redundant on PostgreSQL:
@@ -456,7 +455,10 @@ def default_dsn() -> str:
     url = os.getenv("DATABASE_URL", "").strip()
     if url:
         return url
-    host = os.getenv("PGHOST", "postgres")
+    # Local development defaults to localhost (no Docker network alias).
+    # docker-compose sets PGHOST=postgres explicitly for the container so the
+    # app reaches the postgres service on the compose network.
+    host = os.getenv("PGHOST", "localhost")
     port = os.getenv("PGPORT", "5432")
     db = os.getenv("PGDATABASE", "technopoliss")
     user = os.getenv("PGUSER", "technopoliss")

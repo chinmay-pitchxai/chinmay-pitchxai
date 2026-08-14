@@ -160,6 +160,52 @@
   color: var(--text);
 }
 
+[data-theme="dark"] #tuning-prompt {
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+}
+
+[data-theme="dark"] #tuning-greeting {
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+}
+
+[data-theme="dark"] #tuning-rag {
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+}
+
+[data-theme="dark"] #rag-status-label,
+[data-theme="dark"] .card > div:last-child > span[style*="rgba(0,0,0,.03)"] {
+  background: rgba(255,255,255,0.06);
+}
+
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .reschedule-modal-card input[type="date"],
+[data-theme="dark"] .reschedule-modal-card input[type="datetime-local"] {
+  color-scheme: dark;
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+}
+
+[data-theme="dark"] .reschedule-checkbox-card {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .reschedule-checkbox-card:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+[data-theme="dark"] .reschedule-checkbox-card:has(input:checked) {
+  background: rgba(220,38,38,0.08);
+  border-color: var(--primary);
+}
+
 [data-theme="dark"] .upload-zone:hover {
   background: rgba(186,26,26,0.08);
 }

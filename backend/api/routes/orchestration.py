@@ -97,9 +97,9 @@ async def orchestration_numbers(role: str = Query("campaign")):
         actual = configured[logical]
         metrics = conn.execute(
             """SELECT COUNT(*),
-                      SUM(CASE WHEN lower(outcome) IN ('answered','completed','connected','interested') THEN 1 ELSE 0 END),
-                      SUM(CASE WHEN lower(outcome) IN ('failed','no_answer','busy','error','call_failed') THEN 1 ELSE 0 END),
-                      MAX(COALESCE(ended_at,started_at))
+                      SUM(CASE WHEN lower(outcome) IN ('answered','completed','connected','interested') THEN 1 ELSE 0 END) AS answered_calls,
+                      SUM(CASE WHEN lower(outcome) IN ('failed','no_answer','busy','error','call_failed') THEN 1 ELSE 0 END) AS failed_calls,
+                      MAX(COALESCE(ended_at,started_at)) AS last_used_at
                FROM call_attempts WHERE from_number IN (?,?)""",
             (actual or "__not_configured__", logical),
         ).fetchone()
@@ -127,9 +127,10 @@ async def orchestration_kpis(role: str = Query("campaign")):
         """SELECT w.status,COUNT(*) FROM workflow_jobs w JOIN leads l ON l.id=w.lead_id
            WHERE l.role=? GROUP BY w.status""", (role,)).fetchall()}
     attempts = conn.execute(
-        """SELECT COUNT(*), SUM(CASE WHEN a.attempt_number=2 THEN 1 ELSE 0 END),
-                  SUM(CASE WHEN a.attempt_number=3 THEN 1 ELSE 0 END),
-                  SUM(CASE WHEN lower(a.outcome) IN ('failed','no_answer','busy','error','call_failed') THEN 1 ELSE 0 END)
+        """SELECT COUNT(*) AS total_attempts,
+                  SUM(CASE WHEN a.attempt_number=2 THEN 1 ELSE 0 END) AS retry_2,
+                  SUM(CASE WHEN a.attempt_number=3 THEN 1 ELSE 0 END) AS retry_3,
+                  SUM(CASE WHEN lower(a.outcome) IN ('failed','no_answer','busy','error','call_failed') THEN 1 ELSE 0 END) AS failed_attempts
            FROM call_attempts a JOIN leads l ON l.id=a.lead_id WHERE l.role=?""", (role,)).fetchone()
     total_leads = conn.execute("SELECT COUNT(*) FROM leads WHERE role=?", (role,)).fetchone()[0]
     return {"role": role, "as_of": time.time(), "kpis": {

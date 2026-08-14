@@ -53,9 +53,9 @@ def _operational_breakdown() -> list[dict[str, Any]]:
         placeholders = ",".join("?" for _ in job_types)
         try:
             metrics = conn.execute(
-                f"""SELECT COUNT(DISTINCT lead_id), COUNT(*),
-                    SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),
-                    SUM(CASE WHEN status IN ('scheduled','ready','claimed','running') THEN 1 ELSE 0 END)
+                f"""SELECT COUNT(DISTINCT lead_id) AS distinct_leads, COUNT(*) AS total_jobs,
+                    SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed_jobs,
+                    SUM(CASE WHEN status IN ('scheduled','ready','claimed','running') THEN 1 ELSE 0 END) AS active_jobs
                     FROM workflow_jobs WHERE job_type IN ({placeholders})""",
                 job_types,
             ).fetchone()

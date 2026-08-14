@@ -1197,16 +1197,18 @@ async def handle_vobiz_ws_live(
 
     # Per-role persona anchors. Live models drift to the strongest signal in
     # the prompt; so the sales_1 persona is anchored explicitly at the very top
-    # of the system prompt to prevent drift.
+    # of the system prompt to prevent drift. The agent NAME comes from the
+    # user's saved prompt (extract_agent_name), never hardcoded.
+    _agent_display = agent_name or "Vernika"
     _PERSONA_ANCHORS: dict[str, str] = {
         "sales_1": (
             "[ANCHOR — HIGHEST PRIORITY, OVERRIDES CONFLICTING LINES BELOW]\n"
-            "You are **Vernika**, a **relationship manager** at **Technopolis Constructions Private Limited** — "
+            f"You are **{_agent_display}**, a **relationship manager** at **Technopolis Constructions Private Limited** — "
             "a premium real estate builder in Hyderabad with 17+ years of experience.\n"
             "You are calling about **Solitaire Unity**, a ready-to-move gated community in Kondapur, Hyderabad.\n"
             "START EVERY CALL IN TELUGU (natural conversational Telugu/Tenglish for Hyderabad). "
             "Only switch language if the caller speaks another language first.\n"
-            "If the user asks your name, say **Vernika**.\n"
+            f"If the user asks your name, say **{_agent_display}**.\n"
             "Follow your call prompt exactly — do not deviate from it.\n\n"
         ),
     }
@@ -1667,10 +1669,9 @@ async def handle_vobiz_ws_live(
             )
 
     _base_system_prompt = system_prompt
-    if anchor:
-        system_prompt = name_rule + anchor + pacing_rule + case_block + context_rules + time_block + history_block + _base_system_prompt + detail_block + language_enforcement
-    else:
-        system_prompt = name_rule + pacing_rule + case_block + context_rules + time_block + history_block + _base_system_prompt + detail_block + language_enforcement
+    # No hardcoded persona anchor / scripted name-verify — the operator's
+    # frontend prompt is the source of truth for persona.
+    system_prompt = name_rule + pacing_rule + case_block + context_rules + time_block + history_block + _base_system_prompt + detail_block + language_enforcement
 
     logger.info(f"Vobiz WS (live): client connected for camp={camp_id} role={role}")
 
@@ -2497,10 +2498,20 @@ async def handle_vobiz_ws_live(
                     "NEVER call end_call in the first 60 seconds of an answered call.\n"
                     "This rule OVERRIDES any conflicting instructions below.\n"
                 )
-        if anchor:
-            system_prompt = _pcm_name_rule + anchor + pacing_rule + case_block + context_rules + time_block + history_block + _base_system_prompt + detail_block + language_enforcement
-        else:
-            system_prompt = _pcm_name_rule + pacing_rule + case_block + context_rules + time_block + history_block + _base_system_prompt + detail_block + language_enforcement
+        # System prompt = the operator's frontend prompt + dynamic call data +
+        # operational rules (time, history, language, pacing). No hardcoded
+        # persona anchor and no scripted name-verify block — those conflicted
+        # with the user's saved prompt (e.g. forced "Vernika" over "Priya").
+        system_prompt = (
+            _base_system_prompt
+            + pacing_rule
+            + case_block
+            + context_rules
+            + time_block
+            + history_block
+            + detail_block
+            + language_enforcement
+        )
 
     if _is_incoming:
         if not agent_name:
@@ -2740,13 +2751,28 @@ async def handle_vobiz_ws_live(
                 )
 
             vad_ultra = bool(getattr(settings, "vobiz_ultra_low_latency", False))
+            from core.state import resolved_live_language
+
+            _live_lang, _mirror = resolved_live_language(role)
+            if _mirror:
+                _lang_instruction = (
+                    f"\n\n[LANGUAGE] Speak primarily in {_live_lang} (the configured primary language). "
+                    "If the caller speaks a different language (English, Hindi, Telugu, Kannada, "
+                    "Tamil, Hinglish, Tenglish), mirror them naturally — switch to their language "
+                    "mid-conversation and continue in it. Code-switch like a real local consultant."
+                )
+            else:
+                _lang_instruction = (
+                    f"\n\n[LANGUAGE] Speak only in {_live_lang} regardless of the caller's language."
+                )
+            system_prompt = (system_prompt or "") + _lang_instruction
             setup = build_live_setup(
                 model=model,
                 system_instruction=system_prompt,
                 voice=voice,
                 vad_ultra=vad_ultra,
                 temperature=None,
-                language=settings.gemini_live_language,
+                language=_live_lang,
             )
 
             async def _send_setup_and_kicks() -> None:
@@ -3783,7 +3809,7 @@ async def handle_vobiz_ws_live(
                     logger.warning("Deferred post-name pitch nudge failed: {}", _pn_err)
 
             async def pump_gemini_to_queue() -> None:
-                nonlocal response_t0, last_in_user, last_out_assistant, had_model_audio_turn, last_rag_inject_key, activity_end_seq, last_meaningful_t, last_user_audio_t, _last_user_spoke_t, _user_has_spoken, _opening_delivered, _is_voicemail_mode, _voicemail_triggered, SILENCE_HANGUP_SEC, gemini_resample_state, model_generation_active, _user_has_spoken_since_nudge, _last_user_stt_snippet, _hello_nudge_sent_at, _suppress_gemini_until_nudge, _post_greeting_grace_until, _name_confirmed, _pitch_delivered, _post_name_pitch_nudge_sent, _hello_nudge_count, _name_verify_asked, _last_activity_end_t, _response_started_after_user, _vm_phase, _vm_wait_until, _callee_class, _callee_vm_kind, _greeting_stt_snippets, _dev_mode_active, _dev_mode_nudge_sent, _phase3_nudge_sent, _local_barge_in_requested, _last_model_spoke_t, _barge_in_cooldown_until, _agent_last_finished_t, _agent_turn_audio_started_at, _last_silence_nudge_at, _user_silence_nudge_count, _last_nudge_kind, _fake_dev_block_sent, _confirmed_user_speech_at, _silence_checkin_spoken_count, _continue_explanation_nudge_sent, _ai_disclosure_nudge_sent, _last_turn_pcm_bytes_24k, _commission_delivered, _features_pitch_delivered, _account_manager_cta_count, _commission_pitch_nudge_sent, _anti_refusal_recovery_count, _refusal_audio_block, _refusal_detected_this_turn, _barge_in_drop_audio, _barge_in_drop_audio_at, _turn45_merged, _cp_qa_mode, _cta_bumped_this_turn, _cp_complaint_nudge_sent, _cp_units_nudge_sent_for_stt, _cp_refusal_apology_sent, _user_turn_nudge_sent, _monologue_audio_block, _authoritative_lead_name, _expected_assistant_transcript
+                nonlocal response_t0, last_in_user, last_out_assistant, had_model_audio_turn, last_rag_inject_key, activity_end_seq, last_meaningful_t, last_user_audio_t, _last_user_spoke_t, _user_has_spoken, _opening_delivered, _is_voicemail_mode, _voicemail_triggered, SILENCE_HANGUP_SEC, gemini_resample_state, model_generation_active, _user_has_spoken_since_nudge, _last_user_stt_snippet, _hello_nudge_sent_at, _suppress_gemini_until_nudge, _post_greeting_grace_until, _name_confirmed, _pitch_delivered, _post_name_pitch_nudge_sent, _hello_nudge_count, _name_verify_asked, _last_activity_end_t, _response_started_after_user, _vm_phase, _vm_wait_until, _callee_class, _callee_vm_kind, _greeting_stt_snippets, _dev_mode_active, _dev_mode_nudge_sent, _phase3_nudge_sent, _local_barge_in_requested, _last_model_spoke_t, _barge_in_cooldown_until, _agent_last_finished_t, _agent_turn_audio_started_at, _last_silence_nudge_at, _user_silence_nudge_count, _last_nudge_kind, _fake_dev_block_sent, _confirmed_user_speech_at, _silence_checkin_spoken_count, _continue_explanation_nudge_sent, _ai_disclosure_nudge_sent, _last_turn_pcm_bytes_24k, _commission_delivered, _features_pitch_delivered, _account_manager_cta_count, _commission_pitch_nudge_sent, _anti_refusal_recovery_count, _refusal_audio_block, _refusal_detected_this_turn, _barge_in_drop_audio, _barge_in_drop_audio_at, _turn45_merged, _cp_qa_mode, _cta_bumped_this_turn, _cp_complaint_nudge_sent, _cp_units_nudge_sent_for_stt, _cp_refusal_apology_sent, _user_turn_nudge_sent, _monologue_audio_block, _authoritative_lead_name, _expected_assistant_transcript, _activity_end_nudge_seq
                 first_byte_logged = False
                 _model_turn_pcm_bytes_24k = 0
                 _goaway_nudge_sent = False

@@ -35,9 +35,11 @@ DB_IN_CONTAINER="${DB_IN_CONTAINER:-/app/backend/data/vernika.db}"
 SVC_BACKEND="${SVC_BACKEND:-technopoliss}"
 SVC_OPENWA="${SVC_OPENWA:-openwa}"
 SVC_CADDY="${SVC_CADDY:-caddy}"
+SVC_POSTGRES="${SVC_POSTGRES:-postgres}"
 CT_BACKEND="${CT_BACKEND:-technopoliss-vernika}"
 CT_OPENWA="${CT_OPENWA:-openwa-api}"
 CT_CADDY="${CT_CADDY:-technopoliss-caddy}"
+CT_POSTGRES="${CT_POSTGRES:-technopoliss-postgres}"
 
 LOG_FILE="${LOG_FILE:-/var/log/technopoliss-watchdog.log}"
 STATE_DIR="${STATE_DIR:-/var/lib/technopoliss-watchdog}"
@@ -205,6 +207,10 @@ fix_env_urls() {
 }
 
 sqlite_repair() {
+  # Legacy SQLite repair — the primary store is now PostgreSQL (see core/db.py).
+  # Kept as a guard so old deployments with a SQLite file still get a checkpoint
+  # attempt, but the real database health check is pg_health_check() below.
+  # Nothing here ever touches the Postgres volume.
   local result
   result=$(docker exec "$CT_BACKEND" python -c \
     "import sqlite3;c=sqlite3.connect('${DB_IN_CONTAINER}');print(c.execute('PRAGMA integrity_check').fetchone()[0])" 2>&1)
@@ -222,6 +228,25 @@ sqlite_repair() {
     return 0
   fi
   alert "ESCALATE" "sqlite integrity_check still '${result}' — do NOT auto-delete data"
+  return 1
+}
+
+pg_health_check() {
+  # PostgreSQL is the primary store — verify the container accepts connections.
+  # `pg_isready` is shipped in the official postgres image; exit 0 when ready.
+  if ! ct_running "$CT_POSTGRES"; then
+    start_container "$SVC_POSTGRES" "$CT_POSTGRES" "postgres not running"
+    return 1
+  fi
+  if docker exec "$CT_POSTGRES" pg_isready -U technopoliss -d technopoliss >/dev/null 2>&1; then
+    return 0
+  fi
+  if reach_threshold pg_down 2; then
+    log "ACTION postgres not ready -> restart container"
+    if [ "$WATCHDOG_DRY_RUN" != "1" ]; then
+      restart_container "$SVC_POSTGRES" "$CT_POSTGRES" "pg_isready failed"
+    fi
+  fi
   return 1
 }
 
@@ -260,7 +285,7 @@ main() {
   fi
 
   # --- 3. containers running ------------------------------------------------
-  for pair in "$SVC_BACKEND:$CT_BACKEND" "$SVC_OPENWA:$CT_OPENWA" "$SVC_CADDY:$CT_CADDY"; do
+  for pair in "$SVC_BACKEND:$CT_BACKEND" "$SVC_OPENWA:$CT_OPENWA" "$SVC_CADDY:$CT_CADDY" "$SVC_POSTGRES:$CT_POSTGRES"; do
     svc="${pair%%:*}"; ct="${pair##*:}"
     if ! ct_running "$ct"; then
       start_container "$svc" "$ct" "not running"
@@ -357,21 +382,8 @@ main() {
     fi
   fi
 
-  # --- 10. sqlite integrity / locks -----------------------------------------
-  if ct_running "$CT_BACKEND"; then
-    if docker logs --since 5m "$CT_BACKEND" 2>&1 | grep -qiE 'database is locked|sqlite.*busy'; then
-      if reach_threshold sqlite_locked 2; then
-        log "ACTION sqlite lock detected in logs -> checkpoint"
-        [ "$WATCHDOG_DRY_RUN" = "1" ] || docker exec "$CT_BACKEND" python -c \
-          "import sqlite3;c=sqlite3.connect('${DB_IN_CONTAINER}');c.execute('PRAGMA wal_checkpoint(TRUNCATE)')" >/dev/null 2>&1 || true
-      fi
-    else
-      reset_threshold sqlite_locked
-    fi
-    if ! sqlite_repair; then
-      : # sqlite_repair already escalated/logged
-    fi
-  fi
+  # --- 10. primary database (PostgreSQL) health ------------------------------
+  pg_health_check
 
   # --- 11. disk pressure ----------------------------------------------------
   local used

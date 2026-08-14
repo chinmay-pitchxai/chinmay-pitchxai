@@ -81,10 +81,13 @@ async def transition_lead(
 
     now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     extra = {}
+    raw_extra = lead.get("extra")
     try:
-        extra = json.loads(lead.get("extra") or "{}")
-    except json.JSONDecodeError:
-        pass
+        extra = json.loads(raw_extra) if isinstance(raw_extra, (str, bytes, bytearray)) else (raw_extra or {})
+        if not isinstance(extra, dict):
+            extra = {}
+    except (json.JSONDecodeError, TypeError):
+        extra = {}
     if meta:
         extra.update(meta)
 
@@ -131,6 +134,16 @@ async def _on_transition(
     if to_stage == LeadStage.INTERESTED:
         msg = greeting_after_call(name)
         await send_text_meta(phone, msg)
+        # Plan Phase 6: WhatsApp Immediate Brochure. The durable
+        # whatsapp_package workflow job (live_job_executor) is the source of
+        # truth, but send the brochure right here too so an interested lead
+        # always gets it even if the orchestration job loop is down/backlogged.
+        try:
+            from services.whatsapp.brochure import send_full_package
+
+            await send_full_package(phone, name)
+        except Exception as exc:
+            logger.warning("Immediate brochure send failed for {}: {}", phone, exc)
 
     elif to_stage == LeadStage.DETAILS_SHARED:
         from services.whatsapp.brochure import brochure_message

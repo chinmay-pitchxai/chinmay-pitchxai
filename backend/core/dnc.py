@@ -1,4 +1,11 @@
-"""Operator DNC (Do-Not-Call) list — stored in the primary database (PostgreSQL)."""
+"""Operator DNC (Do-Not-Call) list — stored in the primary database (PostgreSQL).
+
+One canonical DNC register: the ``do_not_contact`` table (created in
+``core/storage.init_db``) keyed by ``normalized_phone`` (last 10 digits). The
+orchestration layer (``orchestration_service.opt_out``) writes to the same
+table, so an opt-out recorded by a call or WhatsApp reply is honored here and
+vice-versa. Legacy SQLite-only ``dnc_list`` is no longer used.
+"""
 
 from loguru import logger
 
@@ -12,14 +19,27 @@ def _conn():
     return _get_conn()
 
 
+def _normalized_key(phone: str) -> str:
+    """Canonical DNC key: last 10 digits (matches orchestration_service.opt_out)."""
+    digits = "".join(c for c in phone if c.isdigit())
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
 def init_dnc_table():
-    """Ensure the DNC (Do Not Call) table exists."""
+    """Ensure the DNC (Do Not Call) table exists.
+
+    The canonical ``do_not_contact`` table is created by ``init_db``; this is a
+    defensive no-op guard for code paths that run before storage init.
+    """
     try:
         conn = _conn()
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS dnc_list ("
-            "phone TEXT UNIQUE PRIMARY KEY, "
-            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            "CREATE TABLE IF NOT EXISTS do_not_contact ("
+            "normalized_phone TEXT PRIMARY KEY, "
+            "lead_id INTEGER, "
+            "reason TEXT DEFAULT '', "
+            "source_interaction TEXT DEFAULT '', "
+            "created_at TEXT DEFAULT (datetime('now'))"
             ")"
         )
         conn.commit()
@@ -27,27 +47,28 @@ def init_dnc_table():
         logger.error("Failed to initialize DNC table: {}", e)
 
 
-def add_to_dnc(phone: str):
-    """Add a phone number to the DNC list."""
-    if not phone:
+def add_to_dnc(phone: str, reason: str = "", source_interaction: str = ""):
+    """Add a phone number to the DNC register (customer opted out)."""
+    key = _normalized_key(phone)
+    if not key:
         return
-    # Normalize phone: extract only digits
-    digits = "".join(c for c in phone if c.isdigit())
-    if not digits:
-        return
-
     init_dnc_table()
     try:
         conn = _conn()
-        conn.execute("INSERT OR IGNORE INTO dnc_list (phone) VALUES (?)", (phone.strip(),))
+        conn.execute(
+            "INSERT INTO do_not_contact (normalized_phone, reason, source_interaction) "
+            "VALUES (?, ?, ?) ON CONFLICT (normalized_phone) DO UPDATE SET "
+            "reason = excluded.reason",
+            (key, (reason or "operator"), source_interaction),
+        )
         conn.commit()
-        logger.info("Added phone to DNC list: {}", phone)
+        logger.info("Added phone to DNC register: {}", phone)
     except Exception as e:
         logger.error("Failed to add to DNC: {}", e)
 
 
 def is_phone_blocked(phone: str) -> bool:
-    """Check if a phone number is on the operator DNC list (customer opted out).
+    """Check if a phone number is on the DNC register (customer opted out).
 
     This is NOT Vobiz telephony provider rejection — see docs for provider-blocked destinations.
     """
@@ -61,15 +82,15 @@ def is_phone_blocked(phone: str) -> bool:
     if any(digits.endswith(s) for s in _HARDCODED_DNC_SUFFIXES):
         return True
 
+    key = _normalized_key(phone)
     init_dnc_table()
     try:
         conn = _conn()
-        rows = conn.execute("SELECT phone FROM dnc_list").fetchall()
-        for r in rows:
-            blocked = r["phone"] if not isinstance(r, (list, tuple)) else r[0]
-            blocked_digits = "".join(c for c in str(blocked) if c.isdigit())
-            if blocked_digits and digits.endswith(blocked_digits):
-                return True
+        row = conn.execute(
+            "SELECT 1 FROM do_not_contact WHERE normalized_phone = ?",
+            (key,),
+        ).fetchone()
+        return row is not None
     except Exception as e:
         logger.error("DNC lookup error: {}", e)
 

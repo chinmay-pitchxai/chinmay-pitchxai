@@ -79,6 +79,26 @@ async def create_callback(payload: CallbackCreate, request: Request):
             detail="Invalid phone number — enter 10 digits (after +91), or a full number starting with +.",
         )
 
+    # TRAI/DND compliance (plan §1.4 / §4.3): never schedule a callback for a
+    # number on the do-not-contact register. The register is keyed by the last
+    # 10 digits (see orchestration_service.opt_out), so normalize the same way.
+    try:
+        from core.storage import _get_conn
+
+        _digits = "".join(ch for ch in phone if ch.isdigit())
+        _dnc_key = _digits[-10:] if len(_digits) >= 10 else _digits
+        if _get_conn().execute(
+            "SELECT 1 FROM do_not_contact WHERE normalized_phone=?", (_dnc_key,)
+        ).fetchone():
+            raise HTTPException(
+                status_code=409,
+                detail="Phone number is registered in the do-not-contact list — callback blocked.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     # Resolve scheduled_at from iso or epoch
     epoch: float | None = None
     if payload.scheduled_at is not None:

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <title>Voice Calling Dashboard</title>
+    <link href="/static/favicon.svg" rel="icon" type="image/svg+xml">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
@@ -109,7 +110,7 @@
     </script>
     
     <!-- Custom styling stylesheet loading -->
-    <link href="index.css" rel="stylesheet">
+    <link href="index.css?v=20260814" rel="stylesheet">
     
     <style>
         body { background-color: theme('colors.background'); }
@@ -146,6 +147,9 @@
         .dark input { background-color: #334155; color: #ffffff; }
         .dark select { background-color: #334155; color: #ffffff; border-color: #475569; }
         .dark option { background-color: #1e293b; }
+        .dark textarea { background-color: #334155; color: #e2e8f0; border-color: #475569; }
+        .dark .bg-surface-container-lowest { background-color: #1e293b; color: #e2e8f0; }
+        .dark input::placeholder, .dark textarea::placeholder, .dark select::placeholder { color: #94a3b8; }
 
         /* Campaign sandbox tabs */
         .camp-tab {
@@ -204,6 +208,10 @@
                 <a class="nav-link flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors duration-200 rounded-lg" href="#" data-view="make-a-call">
                     <span class="material-symbols-outlined">call</span>
                     <span class="text-body-md font-body-md">Make a Call</span>
+                </a>
+                <a class="nav-link flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors duration-200 rounded-lg" href="#" data-view="vobiz">
+                    <span class="material-symbols-outlined">phone_forwarded</span>
+                    <span class="text-body-md font-body-md">Vobiz</span>
                 </a>
                 <a class="nav-link flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors duration-200 rounded-lg" href="#" data-view="config">
                     <span class="material-symbols-outlined">settings</span>
@@ -299,89 +307,89 @@
          </div>
 
          <!-- KPI Row 1 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter gap-y-6">
             <!-- KPI Card 1: Total Leads -->
-            <div onclick="window.openKpiModal('total')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 cursor-pointer">
+            <div onclick="window.openKpiModal('total')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-2 cursor-pointer">
                 <span class="text-label-md font-label-md text-on-surface-variant uppercase">Total Lead</span>
-                <div class="flex items-end justify-between">
-                    <span id="kpi-total-val" class="text-display-lg font-display-lg text-on-surface">8,420</span>
-                    <span class="text-body-sm font-body-sm text-tertiary flex items-center"><span class="material-symbols-outlined text-sm">arrow_upward</span> 12%</span>
+                <div class="flex items-end justify-between gap-3">
+                    <span id="kpi-total-val" class="text-display-lg font-display-lg text-on-surface leading-tight">8,420</span>
+                    <span id="kpi-total-trend" class="text-body-sm font-body-sm text-tertiary flex items-center whitespace-nowrap shrink-0"><span class="material-symbols-outlined text-sm">trending_flat</span> —</span>
                 </div>
                 <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('total')">Details →</button>
             </div>
             <!-- KPI Card 2: Calls Made -->
-            <div onclick="window.openKpiModal('called')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 cursor-pointer">
+            <div onclick="window.openKpiModal('called')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-2 cursor-pointer">
                 <span class="text-label-md font-label-md text-on-surface-variant uppercase">Call Made</span>
-                <div class="flex items-end justify-between">
-                    <span id="kpi-called-val" class="text-display-lg font-display-lg text-on-surface">5,120</span>
-                    <span class="text-body-sm font-body-sm text-tertiary flex items-center"><span class="material-symbols-outlined text-sm">arrow_upward</span> 8%</span>
+                <div class="flex items-end justify-between gap-3">
+                    <span id="kpi-called-val" class="text-display-lg font-display-lg text-on-surface leading-tight">5,120</span>
+                    <span id="kpi-called-trend" class="text-body-sm font-body-sm text-tertiary flex items-center whitespace-nowrap shrink-0"><span class="material-symbols-outlined text-sm">trending_flat</span> —</span>
                 </div>
                 <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('called')">Details →</button>
             </div>
             <!-- KPI Card 3: Interested -->
-            <div onclick="window.openKpiModal('interested')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 relative overflow-hidden cursor-pointer">
+            <div onclick="window.openKpiModal('interested')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-2 relative overflow-hidden cursor-pointer">
                 <div class="absolute inset-0 bg-primary opacity-5"></div>
                 <span class="text-label-md font-label-md text-primary uppercase relative z-10">Interested</span>
-                <div class="flex items-end justify-between relative z-10">
-                    <span id="kpi-interested-val" class="text-display-lg font-display-lg text-on-surface">2,215</span>
-                    <span class="text-body-sm font-body-sm text-tertiary flex items-center"><span class="material-symbols-outlined text-sm">arrow_upward</span> 24%</span>
+                <div class="flex items-end justify-between gap-3 relative z-10">
+                    <span id="kpi-interested-val" class="text-display-lg font-display-lg text-on-surface leading-tight">2,215</span>
+                    <span id="kpi-interested-trend" class="text-body-sm font-body-sm text-tertiary flex items-center whitespace-nowrap shrink-0"><span class="material-symbols-outlined text-sm">trending_flat</span> —</span>
                 </div>
                 <button class="text-[10px] text-primary font-semibold text-left mt-1 relative z-10" onclick="event.stopPropagation();window.openKpiModal('interested')">Details →</button>
             </div>
             <!-- KPI Card 4: Conversion Rate -->
-            <div onclick="window.openKpiModal('conversion')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-1 cursor-pointer">
+            <div onclick="window.openKpiModal('conversion')" class="hover-scale bg-surface rounded-lg p-container-padding border border-surface-container shadow-ambient flex flex-col gap-2 cursor-pointer">
                 <span class="text-label-md font-label-md text-on-surface-variant uppercase">Conversion Rate</span>
-                <div class="flex items-end justify-between">
-                    <span id="kpi-conv-val" class="text-display-lg font-display-lg text-on-surface">43%</span>
-                    <span class="text-body-sm font-body-sm text-error flex items-center"><span class="material-symbols-outlined text-sm">arrow_downward</span> 2%</span>
+                <div class="flex items-end justify-between gap-3">
+                    <span id="kpi-conv-val" class="text-display-lg font-display-lg text-on-surface leading-tight">43%</span>
+                    <span id="kpi-conv-trend" class="text-body-sm font-body-sm text-error flex items-center whitespace-nowrap shrink-0"><span class="material-symbols-outlined text-sm">trending_flat</span> —</span>
                 </div>
                 <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('conversion')">Details →</button>
             </div>
         </div>
 
         <!-- KPI Row 2 (Secondary Metrics) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter gap-y-6">
             <!-- Metric 1: WhatsApp Sent -->
-            <div onclick="window.openKpiModal('whatsapp_sent')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
-                <div class="flex flex-col">
+            <div onclick="window.openKpiModal('whatsapp_sent')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between gap-3 cursor-pointer min-h-[92px]">
+                <div class="flex flex-col gap-1.5">
                     <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">WhatsApp Sent</span>
-                    <span id="kpi-whatsapp-val" class="text-headline-sm font-headline-sm text-on-surface">1,240</span>
+                    <span id="kpi-whatsapp-val" class="text-headline-sm font-headline-sm text-on-surface leading-tight">1,240</span>
                     <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('whatsapp_sent')">Details →</button>
                 </div>
-                <div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary">
+                <div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary shrink-0">
                     <span class="material-symbols-outlined">chat</span>
                 </div>
             </div>
             <!-- Metric 2: Site Visit Scheduled -->
-            <div onclick="window.openKpiModal('site_visit_scheduled')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
-                <div class="flex flex-col">
+            <div onclick="window.openKpiModal('site_visit_scheduled')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between gap-3 cursor-pointer min-h-[92px]">
+                <div class="flex flex-col gap-1.5">
                     <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Site Visit Schedule</span>
-                    <span id="kpi-sitevisit-val" class="text-headline-sm font-headline-sm text-on-surface">320</span>
+                    <span id="kpi-sitevisit-val" class="text-headline-sm font-headline-sm text-on-surface leading-tight">320</span>
                     <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('site_visit_scheduled')">Details →</button>
                 </div>
-                <div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary">
+                <div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary shrink-0">
                     <span class="material-symbols-outlined">location_on</span>
                 </div>
             </div>
             <!-- Metric 3: Not Interested -->
-            <div onclick="window.openKpiModal('not_interested')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
-                <div class="flex flex-col">
+            <div onclick="window.openKpiModal('not_interested')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between gap-3 cursor-pointer min-h-[92px]">
+                <div class="flex flex-col gap-1.5">
                     <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Not Interested</span>
-                    <span id="kpi-notinterested-val" class="text-headline-sm font-headline-sm text-on-surface">1,585</span>
+                    <span id="kpi-notinterested-val" class="text-headline-sm font-headline-sm text-on-surface leading-tight">1,585</span>
                     <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('not_interested')">Details →</button>
                 </div>
-                <div class="w-10 h-10 rounded-full bg-error-container flex items-center justify-center text-error">
+                <div class="w-10 h-10 rounded-full bg-error-container flex items-center justify-center text-error shrink-0">
                     <span class="material-symbols-outlined">thumb_down</span>
                 </div>
             </div>
             <!-- Metric 4: Callbacks -->
-            <div onclick="window.openKpiModal('callbacks')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between cursor-pointer">
-                <div class="flex flex-col">
+            <div onclick="window.openKpiModal('callbacks')" class="hover-scale bg-surface rounded-lg p-4 border border-surface-container shadow-sm flex items-center justify-between gap-3 cursor-pointer min-h-[92px]">
+                <div class="flex flex-col gap-1.5">
                     <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Callbacks</span>
-                    <span id="kpi-callbacks-val" class="text-headline-sm font-headline-sm text-on-surface">450</span>
+                    <span id="kpi-callbacks-val" class="text-headline-sm font-headline-sm text-on-surface leading-tight">450</span>
                     <button class="text-[10px] text-primary font-semibold text-left mt-1" onclick="event.stopPropagation();window.openKpiModal('callbacks')">Details →</button>
                 </div>
-                <div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+                <div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary shrink-0">
                     <span class="material-symbols-outlined">phone_callback</span>
                 </div>
             </div>
@@ -391,215 +399,146 @@
 
          <!-- Campaign Process Flow -->
          <div class="bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding">
-             <h2 class="text-headline-sm font-headline-sm text-on-surface mb-4">Campaign Automation Pipeline</h2>
-             <!-- Pipeline Stages -->
-             <div class="flex items-center justify-between gap-2 mb-6 overflow-x-auto pb-2">
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-primary">upload_file</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">Lead Upload</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-upload-count">0</span>
-                 </div>
-                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-secondary">pending_actions</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">Pending</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-pending-count">0</span>
-                 </div>
-                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-tertiary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-tertiary">phone_in_talk</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">Dialing</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-dialing-count">0</span>
-                 </div>
-                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-tertiary-fixed/30 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-tertiary">task_alt</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">Answered</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-answered-count">0</span>
-                 </div>
-                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-error">call_missed</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">No Answer</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-failed-count">0</span>
-                 </div>
-                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-primary">thumb_up</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">Interested</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-interested-count">0</span>
-                 </div>
-                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-secondary-fixed/30 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-secondary">event</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">Callback</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-callback-count">0</span>
-                 </div>
-                 <span class="material-symbols-outlined text-outline-variant">arrow_forward</span>
-                 <div class="flex flex-col items-center min-w-[100px]">
-                     <div class="w-12 h-12 rounded-full bg-tertiary-container/30 flex items-center justify-center mb-2"><span class="material-symbols-outlined text-tertiary">location_on</span></div>
-                     <span class="text-[10px] font-bold text-on-surface text-center">Site Visit</span>
-                     <span class="text-[9px] text-on-surface-variant" id="pipe-sitevisit-count">0</span>
-                 </div>
-             </div>
-             <!-- Sandbox Flow -->
-             <div class="grid grid-cols-4 gap-3">
-                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h2 class="text-headline-sm font-headline-sm text-on-surface">Campaign Automation Pipeline</h2>
+                <div class="flex gap-3 text-[10px] text-on-surface-variant">
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-primary"></span>Sandbox 1</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>Sandbox 2</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-tertiary"></span>Sandbox 3</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-outline"></span>Sandbox 4</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span>Site Visit</span>
+                </div>
+            </div>
+            <!-- Sales Funnel moved to the charts row (Row 1, next to Outcome Distribution) -->
+             <!-- Sandbox Flow (click to filter dashboard by sandbox) -->
+             <div class="flex flex-wrap items-stretch gap-2">
+                 <div class="flex-1 min-w-[130px] border border-outline-variant rounded-lg p-3 bg-surface-container-low cursor-pointer transition-all hover:border-primary hover:shadow-sm" onclick="window.setSandboxFilter(1)">
                      <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-primary"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 1</span></div>
                      <p class="text-[9px] text-on-surface-variant mb-1">P1, P2 (Cold) · P3 (Digital)</p>
                      <span class="text-sm font-bold text-primary" id="sb1-count">0</span>
                  </div>
-                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+                 <div class="flex items-center justify-center text-outline-variant self-stretch"><span class="material-symbols-outlined text-lg">arrow_forward</span></div>
+                 <div class="flex-1 min-w-[130px] border border-outline-variant rounded-lg p-3 bg-surface-container-low cursor-pointer transition-all hover:border-secondary hover:shadow-sm" onclick="window.setSandboxFilter(2)">
                      <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-secondary"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 2</span></div>
                      <p class="text-[9px] text-on-surface-variant mb-1">P4, P5, P6 — Retry Engine</p>
                      <span class="text-sm font-bold text-secondary" id="sb2-count">0</span>
                  </div>
-                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+                 <div class="flex items-center justify-center text-outline-variant self-stretch"><span class="material-symbols-outlined text-lg">arrow_forward</span></div>
+                 <div class="flex-1 min-w-[130px] border border-outline-variant rounded-lg p-3 bg-surface-container-low cursor-pointer transition-all hover:border-tertiary hover:shadow-sm" onclick="window.setSandboxFilter(3)">
                      <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-tertiary"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 3</span></div>
                      <p class="text-[9px] text-on-surface-variant mb-1">P7, P8 — Nurture &amp; Blue Loop</p>
                      <span class="text-sm font-bold text-tertiary" id="sb3-count">0</span>
                  </div>
-                 <div class="border border-outline-variant rounded-lg p-3 bg-surface-container-low">
+                 <div class="flex items-center justify-center text-outline-variant self-stretch"><span class="material-symbols-outlined text-lg">arrow_forward</span></div>
+                 <div class="flex-1 min-w-[130px] border border-outline-variant rounded-lg p-3 bg-surface-container-low cursor-pointer transition-all hover:border-outline hover:shadow-sm" onclick="window.setSandboxFilter(4)">
                      <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-outline"></span><span class="text-[10px] font-bold text-on-surface uppercase">Sandbox 4</span></div>
                      <p class="text-[9px] text-on-surface-variant mb-1">P9 — Post-Visit Feedback</p>
                      <span class="text-sm font-bold text-on-surface-variant" id="sb4-count">0</span>
                  </div>
              </div>
+             <div class="flex justify-center mt-2">
+                 <button class="px-3 py-1 rounded-full text-label-sm font-label-sm uppercase text-primary hover:bg-primary-fixed/20 transition-all" onclick="window.setSandboxFilter(0)">View All Sandboxes →</button>
+             </div>
          </div>
 
          <!-- Main Charts Area -->
-         <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
-            <!-- Engagement Timeline (Area Chart) -->
-            <div class="lg:col-span-8 bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding flex flex-col h-[400px]">
-                <div class="flex justify-between items-start mb-6">
-                    <h2 class="text-headline-sm font-headline-sm text-on-surface">Engagement Timeline</h2>
-                    <div class="flex gap-2">
-                        <button id="engagement-btn-all" class="engagement-filter-btn px-3 py-1 rounded-full border border-primary text-primary text-label-sm font-label-sm uppercase bg-primary-fixed/20" onclick="window.setEngagementTimelineFilter('all')">Total Calls</button>
-                        <button id="engagement-btn-interested" class="engagement-filter-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.setEngagementTimelineFilter('Interested')">Interested</button>
-                        <button id="engagement-btn-clear" class="px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm italic hover:bg-surface-container" onclick="window.setEngagementTimelineFilter('all')">Clear</button>
-                        <div class="flex items-center gap-1.5 ml-2"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Interested</span></div>
-                    </div>
-                </div>
-                <!-- Custom SVG Area Chart -->
-                <div class="flex-1 w-full relative mt-4">
-                    <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 800 250">
-                        <!-- Grid lines -->
-                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="200" y2="200"></line>
-                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="150" y2="150"></line>
-                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="100" y2="100"></line>
-                        <line stroke="#e1e3e4" stroke-dasharray="4" x1="0" x2="800" y1="50" y2="50"></line>
-                        
-                        <!-- Area Gradients -->
-                        <defs>
-                            <linearGradient id="areaGradient" x1="0" x2="0" y1="0" y2="1">
-                                <stop offset="0%" stop-color="#bd0917" stop-opacity="0.2"></stop>
-                                <stop offset="100%" stop-color="#bd0917" stop-opacity="0.0"></stop>
-                            </linearGradient>
-                            <linearGradient id="interestedGradient" x1="0" x2="0" y1="0" y2="1">
-                                <stop offset="0%" stop-color="#00857f" stop-opacity="0.2"></stop>
-                                <stop offset="100%" stop-color="#00857f" stop-opacity="0.0"></stop>
-                            </linearGradient>
-                        </defs>
-                        
-                        <!-- Total Calls Area (Red) -->
-                        <path id="svg-calls-fill" d="M0,230 L100,230 L200,180 L300,50 L400,230 L500,230 L600,230 L700,230 L800,230 L800,250 L0,250 Z" fill="url(#areaGradient)"></path>
-                        <path id="svg-calls-line" d="M0,230 L100,230 L200,180 L300,50 L400,230 L500,230 L600,230 L700,230 L800,230" fill="none" stroke="#bd0917" stroke-width="2"></path>
-                        
-                        <!-- Interested Area (Teal) -->
-                        <path id="svg-int-fill" d="M0,230 L100,230 L200,210 L300,120 L400,230 L500,230 L600,230 L700,230 L800,230 L800,250 L0,250 Z" fill="url(#interestedGradient)"></path>
-                        <path id="svg-int-line" d="M0,230 L100,230 L200,210 L300,120 L400,230 L500,230 L600,230 L700,230 L800,230" fill="none" stroke="#00857f" stroke-width="2"></path>
-                        
-                        <!-- Data Points -->
-                        <circle id="chart-marker-calls" cx="300" cy="50" fill="#bd0917" r="4"></circle>
-                        <circle id="chart-marker-int" cx="300" cy="120" fill="#00857f" r="4"></circle>
-                        
-                        <!-- Tooltip line cursor -->
-                        <line id="chart-tooltip-line" x1="0" y1="30" x2="0" y2="230" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4" style="display:none;" />
-                        
-                        <!-- Tooltip highlighted dots -->
-                        <circle id="chart-tooltip-dot-calls" cx="0" cy="0" r="5" fill="#bd0917" stroke="#ffffff" stroke-width="1.5" style="display:none;" />
-                        <circle id="chart-tooltip-dot-int" cx="0" cy="0" r="5" fill="#00857f" stroke="#ffffff" stroke-width="1.5" style="display:none;" />
-                        
-                        <!-- Invisible mouse interaction overlay -->
-                        <rect id="chart-hover-overlay" x="0" y="0" width="800" height="250" fill="transparent" style="cursor: crosshair;" />
-                    </svg>
-                    
-                    <!-- Floating Tooltip Card -->
-                    <div id="chart-tooltip-card" class="absolute bg-surface border border-outline-variant rounded-lg p-2.5 shadow-lg text-xs pointer-events-none" style="display: none; z-index: 50; min-width: 140px;">
-                        <div id="chart-tooltip-date" class="font-bold text-on-surface mb-1">Date</div>
-                        <div class="flex items-center gap-1.5 text-on-surface-variant mb-0.5">
-                            <span class="w-2 h-2 rounded-full bg-primary"></span>
-                            <span>Total Calls: </span><span id="chart-tooltip-val-calls" class="font-bold text-on-surface ml-auto">0</span>
-                        </div>
-                        <div class="flex items-center gap-1.5 text-on-surface-variant">
-                            <span class="w-2 h-2 rounded-full bg-[#00857f]"></span>
-                            <span>Interested: </span><span id="chart-tooltip-val-int" class="font-bold text-on-surface ml-auto">0</span>
-                        </div>
-                    </div>
-                    <!-- X-Axis Labels -->
-                    <div class="absolute bottom-0 w-full flex justify-between text-label-sm font-label-sm text-on-surface-variant px-2 transform translate-y-full pt-2">
-                        <span>Sat</span>
-                        <span>Sun</span>
-                        <span>Mon</span>
-                        <span>Tue</span>
-                        <span>Wed</span>
-                        <span>Thu</span>
-                        <span>Fri</span>
-                    </div>
-                    <!-- Y-Axis Labels -->
-                    <div id="chart-y-axis" class="absolute left-0 h-full flex flex-col justify-between text-label-sm font-label-sm text-on-surface-variant transform -translate-x-full pr-2" style="top: 0; padding-bottom: 20px;">
-                        <span>800</span>
-                        <span>600</span>
-                        <span>400</span>
-                        <span>200</span>
-                        <span>0</span>
-                    </div>
-                </div>
-            </div>
+         <!-- Row 1: Outcome Distribution (donut) + Sales Funnel side-by-side -->
+         <div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter items-stretch">
+             <!-- Outcome Distribution (Donut Chart) -->
+             <div class="bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding flex flex-col h-[400px]">
+                 <div class="flex justify-between items-start mb-6">
+                     <h2 class="text-headline-sm font-headline-sm text-on-surface">Outcome Distribution</h2>
+                     <div class="flex gap-1.5 flex-wrap justify-end">
+                         <button class="donut-filter-btn px-2 py-1 rounded-full border border-primary text-primary text-label-sm font-label-sm uppercase bg-primary-fixed/20" data-donut-filter="all" onclick="window.setDonutFilter('all')">All</button>
+                         <button class="donut-filter-btn px-2 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" data-donut-filter="Interested" onclick="window.setDonutFilter('Interested')">Interested</button>
+                         <button class="donut-filter-btn px-2 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" data-donut-filter="Failed" onclick="window.setDonutFilter('Failed')">Failed</button>
+                         <button class="donut-filter-btn px-2 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" data-donut-filter="Callback" onclick="window.setDonutFilter('Callback')">Callback</button>
+                         <button class="donut-filter-btn px-2 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" data-donut-filter="Answered" onclick="window.setDonutFilter('Answered')">Answered</button>
+                     </div>
+                 </div>
+                 <div class="flex-1 flex flex-col items-center justify-center relative">
+                     <div id="outcome-chart" class="w-full max-w-[320px] min-h-[240px]"></div>
+                     <div class="mt-6 flex flex-wrap justify-center gap-3">
+                         <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-primary"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Interested</span></div>
+                         <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-outline-variant"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Failed</span></div>
+                         <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-secondary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Call Later</span></div>
+                         <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Answered</span></div>
+                     </div>
+                 </div>
+             </div>
 
-            <!-- Outcome Distribution (Donut Chart) -->
-            <div class="lg:col-span-4 bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding flex flex-col h-[400px]">
-                <div class="flex justify-between items-start mb-6">
-                    <h2 class="text-headline-sm font-headline-sm text-on-surface">Outcome Distribution</h2>
-                </div>
-                <div class="flex-1 flex flex-col items-center justify-center relative">
-                    <div class="relative w-48 h-48">
-                        <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" fill="transparent" r="40" stroke="#f3f4f5" stroke-width="15"></circle>
-                            <circle id="donut-seg-1" cx="50" cy="50" fill="transparent" r="40" stroke="#bd0917" stroke-dasharray="180 251.2" stroke-dashoffset="0" stroke-width="15" class="donut-segment-1"></circle>
-                            <circle id="donut-seg-2" cx="50" cy="50" fill="transparent" r="40" stroke="#e5bdb9" stroke-dasharray="40 251.2" stroke-dashoffset="-180" stroke-width="15" class="donut-segment-2"></circle>
-                            <circle id="donut-seg-3" cx="50" cy="50" fill="transparent" r="40" stroke="#5cb1ff" stroke-dasharray="20 251.2" stroke-dashoffset="-220" stroke-width="15" class="donut-segment-3"></circle>
-                            <circle id="donut-seg-4" cx="50" cy="50" fill="transparent" r="40" stroke="#00857f" stroke-dasharray="11.2 251.2" stroke-dashoffset="-240" stroke-width="15" class="donut-segment-4"></circle>
-                            <circle cx="50" cy="50" fill="transparent" r="40" stroke="#ffffff" stroke-dasharray="2 178 2 38 2 18 2 9.2" stroke-dashoffset="0" stroke-width="16" pointer-events="none"></circle>
-                        </svg>
-                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span id="donut-center-count" class="text-headline-md font-headline-md text-on-surface">2,215</span>
-                            <span id="donut-center-label" class="text-label-sm font-label-sm text-on-surface-variant">Total</span>
-                        </div>
-                    </div>
-                    <!-- Floating Donut Tooltip Card -->
-                    <div id="donut-tooltip-card" class="absolute bg-surface border border-outline-variant rounded-lg p-2 shadow-lg text-xs pointer-events-none" style="display: none; z-index: 50; min-width: 120px;">
-                        <div id="donut-tooltip-title" class="font-bold text-on-surface mb-0.5">Category</div>
-                        <div class="flex items-center gap-1.5 text-on-surface-variant">
-                            <span id="donut-tooltip-color" class="w-2.5 h-2.5 rounded-full"></span>
-                            <span>Value: </span><span id="donut-tooltip-val" class="font-bold text-on-surface ml-auto">0</span>
-                        </div>
-                    </div>
-                    <div class="mt-6 flex flex-wrap justify-center gap-3">
-                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-primary"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Interested</span></div>
-                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-outline-variant"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Failed</span></div>
-                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-secondary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Call Later</span></div>
-                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Answered</span></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+             <!-- Sales Funnel (5 stages, widths shrink from SB1 to Site Visit) -->
+             <div class="bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding flex flex-col h-[400px]">
+                 <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+                     <h2 class="text-headline-sm font-headline-sm text-on-surface">Sales Funnel</h2>
+                     <div class="flex gap-3 text-[10px] text-on-surface-variant">
+                         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-primary"></span>Sandbox 1</span>
+                         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>Sandbox 2</span>
+                         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-tertiary"></span>Sandbox 3</span>
+                         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-outline"></span>Sandbox 4</span>
+                         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span>Site Visit</span>
+                     </div>
+                 </div>
+                 <div class="flex-1 flex flex-col items-center justify-center gap-1.5">
+                     <div class="funnel-stage w-full max-w-[560px] bg-primary/90 text-on-primary rounded-md py-2.5 px-4 flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity shadow-sm" data-funnel-sandbox="1" onclick="window.openSandboxCampaign(1)" title="Click to open Sandbox 1 campaign">
+                         <span class="text-[11px] font-bold uppercase tracking-wide">Sandbox 1 · Cold + Digital</span>
+                         <span class="text-sm font-extrabold"><span id="funnel-sb1">0</span> leads</span>
+                     </div>
+                     <div class="funnel-stage w-full max-w-[482px] bg-secondary/85 text-on-secondary rounded-md py-2.5 px-4 flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity shadow-sm" data-funnel-sandbox="2" onclick="window.openSandboxCampaign(2)" title="Click to open Sandbox 2 campaign">
+                         <span class="text-[11px] font-bold uppercase tracking-wide">Sandbox 2 · Retry Engine</span>
+                         <span class="text-sm font-extrabold"><span id="funnel-sb2">0</span> leads</span>
+                     </div>
+                     <div class="funnel-stage w-full max-w-[392px] bg-tertiary/85 text-on-tertiary rounded-md py-2.5 px-4 flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity shadow-sm" data-funnel-sandbox="3" onclick="window.openSandboxCampaign(3)" title="Click to open Sandbox 3 campaign">
+                         <span class="text-[11px] font-bold uppercase tracking-wide">Sandbox 3 · Nurture &amp; Blue Loop</span>
+                         <span class="text-sm font-extrabold"><span id="funnel-sb3">0</span> leads</span>
+                     </div>
+                     <div class="funnel-stage w-full max-w-[291px] bg-outline/80 text-on-surface rounded-md py-2.5 px-4 flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity shadow-sm" data-funnel-sandbox="4" onclick="window.openSandboxCampaign(4)" title="Click to open Sandbox 4 campaign">
+                         <span class="text-[11px] font-bold uppercase tracking-wide">Sandbox 4 · Feedback</span>
+                         <span class="text-sm font-extrabold"><span id="funnel-sb4">0</span> leads</span>
+                     </div>
+                     <div class="funnel-stage w-full max-w-[213px] bg-tertiary-container text-on-tertiary-container rounded-md py-2.5 px-4 flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity shadow-sm" data-funnel-sandbox="visit" onclick="window.setDonutFilter('all'); window.showToast('Showing site-visit leads','info')" title="Site visits scheduled">
+                         <span class="text-[11px] font-bold uppercase tracking-wide">Site Visit</span>
+                         <span class="text-sm font-extrabold"><span id="funnel-sv">0</span> leads</span>
+                     </div>
+                 </div>
+             </div>
+         </div>
+
+         <!-- Row 2: Engagement Timeline (Area Chart, full width) -->
+         <div class="bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding flex flex-col w-full">
+             <div class="flex justify-between items-start mb-6 flex-wrap gap-3">
+                 <h2 class="text-headline-sm font-headline-sm text-on-surface">Engagement Timeline</h2>
+                 <div class="flex gap-2 flex-wrap items-center">
+                     <button id="engagement-btn-all" class="engagement-filter-btn px-3 py-1 rounded-full border border-primary text-primary text-label-sm font-label-sm uppercase bg-primary-fixed/20" onclick="window.setEngagementTimelineFilter('all')">Total Calls</button>
+                     <button id="engagement-btn-interested" class="engagement-filter-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.setEngagementTimelineFilter('Interested')">Interested</button>
+                     <button id="engagement-btn-clear" class="px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm italic hover:bg-surface-container" onclick="window.setEngagementTimelineFilter('all')">Clear</button>
+                     <div class="flex items-center gap-1.5 ml-2"><span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span><span class="text-label-sm font-label-sm text-on-surface-variant">Interested</span></div>
+                 </div>
+             </div>
+             <!-- ApexCharts Area Chart (Engagement Timeline) -->
+             <div class="w-full relative">
+                 <div id="engagement-chart" class="w-full h-[360px]"></div>
+             </div>
+         </div>
 
         <!-- Hourly Distribution -->
         <div id="hourly-distribution" class="bg-surface rounded-lg border border-surface-container shadow-ambient p-container-padding w-full mb-8 relative">
-            <div class="flex justify-between items-start mb-6">
+            <div class="flex justify-between items-start mb-6 flex-wrap gap-3">
                 <h2 class="text-headline-sm font-headline-sm text-on-surface">Hourly Distribution</h2>
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-wrap items-center">
+                    <div class="flex items-center gap-1.5 border border-outline-variant rounded-full px-3 py-1">
+                        <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">From</span>
+                        <select id="hourly-from" class="text-body-sm bg-transparent border-none focus:outline-none cursor-pointer text-on-surface">
+                            <option value="0">12 AM</option><option value="1">1 AM</option><option value="2">2 AM</option><option value="3">3 AM</option><option value="4">4 AM</option><option value="5">5 AM</option><option value="6">6 AM</option><option value="7">7 AM</option><option value="8">8 AM</option><option value="9">9 AM</option><option value="10">10 AM</option><option value="11">11 AM</option><option value="12">12 PM</option><option value="13">1 PM</option><option value="14">2 PM</option><option value="15">3 PM</option><option value="16">4 PM</option><option value="17">5 PM</option><option value="18">6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option><option value="21">9 PM</option><option value="22">10 PM</option><option value="23">11 PM</option>
+                        </select>
+                        <span class="text-on-surface-variant">–</span>
+                        <span class="text-label-sm font-label-sm text-on-surface-variant uppercase">To</span>
+                        <select id="hourly-to" class="text-body-sm bg-transparent border-none focus:outline-none cursor-pointer text-on-surface">
+                            <option value="23">11 PM</option><option value="22">10 PM</option><option value="21">9 PM</option><option value="20">8 PM</option><option value="19">7 PM</option><option value="18">6 PM</option><option value="17">5 PM</option><option value="16">4 PM</option><option value="15">3 PM</option><option value="14">2 PM</option><option value="13">1 PM</option><option value="12">12 PM</option><option value="11">11 AM</option><option value="10">10 AM</option><option value="9">9 AM</option><option value="8">8 AM</option><option value="7">7 AM</option><option value="6">6 AM</option><option value="5">5 AM</option><option value="4">4 AM</option><option value="3">3 AM</option><option value="2">2 AM</option><option value="1">1 AM</option><option value="0">12 AM</option>
+                        </select>
+                        <button class="px-2 py-0.5 rounded-full bg-primary text-on-primary text-label-sm font-label-sm uppercase" onclick="window.applyHourlyRange()">Apply</button>
+                        <button class="px-2 py-0.5 rounded-full text-on-surface-variant hover:text-primary text-label-sm font-label-sm uppercase" onclick="window.filterHourlyDistribution('all')">Clear</button>
+                    </div>
                     <button id="hourly-btn-all" class="hourly-range-btn px-3 py-1 rounded-full border border-primary text-primary text-label-sm font-label-sm uppercase bg-primary-fixed/20" onclick="window.filterHourlyDistribution('all')">All Hours</button>
                     <button id="hourly-btn-morning" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('morning')">6-9A</button>
                     <button id="hourly-btn-lateam" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('lateam')">9-12P</button>
@@ -608,40 +547,7 @@
                     <button id="hourly-btn-night" class="hourly-range-btn px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container" onclick="window.filterHourlyDistribution('night')">6-9P</button>
                 </div>
             </div>
-            <div class="h-[200px] flex items-end justify-around gap-2 mt-4 px-4 border-b border-surface-container-high pb-2 relative">
-                <!-- Background Grid -->
-                <div class="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2 opacity-30">
-                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
-                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
-                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
-                    <div class="border-b border-dashed border-outline-variant w-full h-0"></div>
-                </div>
-                <!-- Bars -->
-                <div class="w-8 chart-bar h-[5%] z-10" data-bar-idx="0"></div>
-                <div class="w-8 chart-bar h-[25%] z-10" data-bar-idx="1"></div>
-                <div class="w-8 chart-bar h-[12%] z-10" data-bar-idx="2"></div>
-                <div class="w-8 chart-bar h-[30%] z-10" data-bar-idx="3"></div>
-                <div class="w-8 chart-bar h-[60%] z-10" data-bar-idx="4"></div>
-                <div class="w-8 chart-bar h-[45%] z-10" data-bar-idx="5"></div>
-                <div class="w-8 chart-bar h-[55%] z-10" data-bar-idx="6"></div>
-                <div class="w-8 chart-bar h-[95%] z-10 bg-primary" data-bar-idx="7"></div> <!-- Peak Hour -->
-                <div class="w-8 chart-bar h-[90%] z-10" data-bar-idx="8"></div>
-                <div class="w-8 chart-bar h-[85%] z-10" data-bar-idx="9"></div>
-                <div class="w-8 chart-bar h-[75%] z-10" data-bar-idx="10"></div>
-                <div class="w-8 chart-bar h-[65%] z-10" data-bar-idx="11"></div>
-            </div>
-            <div class="flex justify-around mt-2 text-label-sm font-label-sm text-on-surface-variant px-4">
-                <span>12A</span><span>2A</span><span>4A</span><span>6A</span><span>8A</span><span>10A</span><span>12P</span><span>2P</span><span>4P</span><span>6P</span><span>8P</span><span>10P</span>
-            </div>
-            
-            <!-- Floating Bar Tooltip Card -->
-            <div id="bar-tooltip-card" class="absolute bg-surface border border-outline-variant rounded-lg p-2.5 shadow-lg text-xs pointer-events-none" style="display: none; z-index: 50; min-width: 130px;">
-                <div id="bar-tooltip-hour" class="font-bold text-on-surface mb-1">Hour Interval</div>
-                <div class="flex items-center gap-1.5 text-on-surface-variant">
-                    <span class="w-2.5 h-2.5 rounded bg-tertiary-container"></span>
-                    <span>Calls Made: </span><span id="bar-tooltip-val" class="font-bold text-on-surface ml-auto">0</span>
-                </div>
-            </div>
+            <div id="hourly-chart" class="w-full h-[240px] mt-2"></div>
         </div>
 
         <!-- Table / Logs Canvas -->
@@ -667,6 +573,9 @@
                     </div>
                 </div>
                  <div class="flex gap-4 items-center flex-wrap">
+                     <select id="filter-source" class="bg-surface border border-outline-variant rounded-md px-3 py-1 text-body-sm w-48 cursor-pointer focus:outline-none">
+                         <option value="all">All Sources</option>
+                     </select>
                      <select id="filter-location" class="bg-surface border border-outline-variant rounded-md px-3 py-1 text-body-sm w-48 cursor-pointer focus:outline-none">
                          <option>All Locations</option>
                          <option>Technopolis Solitaire Unity</option>
@@ -696,6 +605,7 @@
                         <tr class="bg-surface-container-low border-b border-surface-container">
                             <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Contact</th>
                             <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Phone</th>
+                            <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Source</th>
                             <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Date/Time</th>
                             <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase w-1/4">Summary (Transcript QA)</th>
                             <th class="p-4 text-label-sm font-label-sm text-on-surface-variant uppercase">Rating</th>
@@ -1229,6 +1139,60 @@
             </div>
         </div>
 
+        <!-- Voice & Language (pre-recorded audio + primary language + multilingual mirroring) -->
+        <div class="bg-surface rounded-xl p-6 border border-surface-container shadow-ambient">
+            <div class="flex items-start justify-between flex-wrap gap-3 mb-4">
+                <div>
+                    <h3 class="text-headline-sm font-headline-sm text-on-surface">Voice &amp; Language</h3>
+                    <p class="text-[11px] text-on-surface-variant mt-0.5 max-w-[620px]">Pre-recorded greeting audio, primary language and multilingual mirroring — saved instantly to the backend and used on the very next call. No server edits needed.</p>
+                </div>
+                <span id="voice-status-pill" class="text-[10px] font-extrabold uppercase tracking-widest bg-surface-container-highest text-on-surface-variant px-2.5 py-1 rounded-full">Loading…</span>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <!-- Pre-recorded audio -->
+                <div class="bg-surface-container-low rounded-xl p-5 border border-surface-container">
+                    <h4 class="text-body-md font-bold text-on-surface mb-1">Pre-recorded Greeting Audio</h4>
+                    <p class="text-[10px] text-on-surface-variant mb-3">This audio plays the instant the call connects — Gemini Live connects during playback and takes over for questions.</p>
+                    <div class="flex items-center gap-3 px-3 py-2.5 bg-surface-container-lowest rounded-lg border border-surface-container mb-3">
+                        <span id="greeting-audio-icon" class="text-lg">🎙️</span>
+                        <div class="flex-1 min-w-0">
+                            <div id="greeting-audio-label" class="text-xs font-bold text-on-surface truncate">Checking…</div>
+                            <div id="greeting-audio-meta" class="text-[10px] text-on-surface-variant">—</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 transition-all" onclick="window.recordGreetingAudio()">
+                            Record Greeting
+                        </button>
+                        <button type="button" class="px-4 py-2 border border-outline-variant text-on-surface rounded-lg text-xs font-bold hover:bg-surface-container transition-all" onclick="window.refreshGreetingAudio()">
+                            Refresh Status
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-on-surface-variant mt-2">Record uses Gemini Live with the same voice as calls (needs Gemini credits).</p>
+                </div>
+
+                <!-- Language -->
+                <div class="bg-surface-container-low rounded-xl p-5 border border-surface-container">
+                    <h4 class="text-body-md font-bold text-on-surface mb-1">Primary Language</h4>
+                    <p class="text-[10px] text-on-surface-variant mb-3">The agent speaks this language by default; with mirroring ON it switches to the caller's language naturally.</p>
+                    <label class="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">Primary language</label>
+                    <select id="config-language" class="w-full bg-surface-container-lowest border border-outline-variant rounded-md px-3 py-2 text-body-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary mb-3">
+                        <option value="te-IN">Telugu (తెలుగు) — primary</option>
+                        <option value="en-IN">English (India)</option>
+                        <option value="hi-IN">Hindi (हिन्दी)</option>
+                        <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
+                        <option value="ta-IN">Tamil (தமிழ்)</option>
+                    </select>
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" id="config-multilingual-mirror" checked class="w-4 h-4 accent-primary">
+                        <span class="text-xs font-semibold text-on-surface">Multilingual mirroring</span>
+                    </label>
+                    <p class="text-[10px] text-on-surface-variant mt-1">When a caller speaks another language (English, Hindi, Telugu, Kannada…), the agent switches to it mid-call like a real local consultant.</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Campaign Cases -->
         <div class="bg-surface rounded-xl p-6 border border-surface-container shadow-ambient">
             <div class="flex items-start justify-between flex-wrap gap-3 mb-4">
@@ -1269,6 +1233,72 @@
             <div class="p-4 border-t border-surface-container bg-surface-container-low flex justify-end gap-3">
                 <button class="px-4 py-2 border border-outline-variant rounded-lg text-xs font-bold hover:bg-surface-container-high" onclick="window.closeModal('modal-case')">Cancel</button>
                 <button id="case-save-btn" class="px-5 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 transition-all" onclick="window.saveCase()">Save Case</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ────────── VIEW: Vobiz (dedicated tab) ────────── -->
+    <div id="view-vobiz" class="p-page-margin flex flex-col gap-6 w-full" style="display:none;">
+        <div class="flex items-start justify-between flex-wrap gap-3">
+            <div>
+                <h1 class="text-2xl font-bold text-on-surface">Vobiz Integration</h1>
+                <p class="text-xs text-on-surface-variant mt-1 max-w-[640px]">Manage Vobiz calling credentials, webhook and phone numbers entirely from here — saved to the backend instantly, no server access needed. Add multiple auth ID / token accounts and switch the active one anytime.</p>
+            </div>
+            <button class="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 transition-all" onclick="window.saveVobizConfig()">Save Vobiz Settings</button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Auth accounts -->
+            <div class="bg-surface rounded-xl p-6 border border-surface-container shadow-ambient">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Auth Accounts (Multiple)</span>
+                    <button class="px-3 py-1.5 bg-surface-container-highest text-on-surface rounded-full text-[10px] font-bold hover:opacity-90 transition-all" onclick="window.addVobizAccount()">+ Add Account</button>
+                </div>
+                <div id="vobiz-accounts" class="flex flex-col gap-3"></div>
+                <div class="flex flex-col gap-2 px-3 py-2 bg-surface-container-low rounded-lg mt-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm text-on-surface-variant">call_made</span>
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Outbound Webhook (Answer URL)</span>
+                    </div>
+                    <code id="vobiz-webhook" class="text-[10px] font-mono text-primary break-all">—</code>
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm text-on-surface-variant">call_received</span>
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Inbound Webhook (Incoming)</span>
+                    </div>
+                    <code id="vobiz-inbound-webhook" class="text-[10px] font-mono text-primary break-all">—</code>
+                    <p class="text-[9px] text-on-surface-variant">Set these URLs as the Answer / Incoming URLs in your Vobiz application. Incoming calls to any of your numbers are answered by the AI.</p>
+                </div>
+                <div id="vobiz-env-note" class="hidden text-[10px] text-tertiary px-3 py-2 bg-surface-container-low rounded-lg mt-2">Note: server .env credentials take precedence over stored values for the active account.</div>
+            </div>
+
+            <!-- Phone numbers P1-P9 (plug-and-play) -->
+            <div class="bg-surface rounded-xl p-6 border border-surface-container shadow-ambient">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Phone Numbers (P1–P9)</span>
+                    <span class="text-[10px] text-on-surface-variant">Saved numbers auto-apply to the call allocator.</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P1 (Cold)</label><input id="vobiz-p1" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P2 (Cold)</label><input id="vobiz-p2" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P3 (Digital ×2)</label><input id="vobiz-p3" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P4 (Retry 2)</label><input id="vobiz-p4" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P5 (Retry 3 Cold)</label><input id="vobiz-p5" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P6 (Retry 3 Digi)</label><input id="vobiz-p6" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P7 (Nurture)</label><input id="vobiz-p7" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P8 (Nurture)</label><input id="vobiz-p8" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                    <div class="flex flex-col gap-1"><label class="text-[10px] font-bold text-on-surface-variant">P9 (Feedback)</label><input id="vobiz-p9" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..."></div>
+                </div>
+                <p class="text-[10px] text-on-surface-variant mt-2">Enter numbers with country code (e.g. <code class="font-mono">+919876543210</code>). Saved numbers are used by the orchestration engine immediately.</p>
+
+                <!-- Extra numbers (beyond P1-P9) -->
+                <div class="mt-5 pt-4 border-t border-surface-container">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Extra Numbers (optional)</span>
+                        <button class="px-3 py-1.5 bg-surface-container-highest text-on-surface rounded-full text-[10px] font-bold hover:opacity-90 transition-all" onclick="window.addVobizNumber()">+ Add Number</button>
+                    </div>
+                    <div id="vobiz-extra-numbers" class="flex flex-col gap-2"></div>
+                    <p class="text-[9px] text-on-surface-variant mt-2">Add more Vobiz numbers to dial from (round-robin). Save to make them live in the allocator instantly.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1402,7 +1432,8 @@
 <div id="toast-host" aria-live="polite" aria-atomic="false"></div>
 
 <!-- Scripts loading -->
-<script src="app.js?v=2"></script>
+<script src="/static/apexcharts.min.js"></script>
+<script src="app.js?v=10"></script>
 <script src="kpi_modal.js"></script>
 </body>
 </html>

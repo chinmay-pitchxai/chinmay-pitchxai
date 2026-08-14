@@ -108,7 +108,9 @@ def sandbox_for_stage(stage: LeadStage | str) -> int:
         LeadStage.CONNECTED: 1,  # Connected from first touch stays in SB1 context
         LeadStage.INTERESTED: 3,
         LeadStage.FOLLOW_UP: 3,
-        LeadStage.CALLBACK_REQUESTED: 3,
+        # Plan flowchart: scheduled callbacks dial back through Sandbox 1 lines
+        # (P1/P2 cold, P3 digital), so a callback-requested lead stays in SB1.
+        LeadStage.CALLBACK_REQUESTED: 1,
         LeadStage.SITE_VISIT_SCHEDULED: 3,
         LeadStage.SITE_VISIT_COMPLETED: 4,
         LeadStage.FEEDBACK_PENDING: 4,

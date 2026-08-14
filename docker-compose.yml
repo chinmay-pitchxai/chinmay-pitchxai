@@ -11,6 +11,12 @@ x-backend-env: &backend-env
   HOST: 0.0.0.0
   PORT: 9090
   VERN_DATA_DIR: /app/backend/data
+  # PostgreSQL — the postgres service on the compose network is the primary store.
+  PGHOST: postgres
+  PGPORT: "5432"
+  PGDATABASE: technopoliss
+  PGUSER: technopoliss
+  PGPASSWORD: technopoliss
   # Gemini + Vobiz credentials and every runtime setting come from backend/.env
   ENV_FILE_GUARD: "1"
 

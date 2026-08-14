@@ -1453,6 +1453,13 @@ def _bulk_add_leads_sync(role: str, leads: list[dict]) -> tuple[int, int, int]:
                 if k not in _RESERVED and v not in (None, "")
             }
         extras_dict = {str(k): str(v) for k, v in extras_dict.items() if str(v).strip()}
+        # Persist upload provenance (original file name / Google Sheet broker) into
+        # ``extra`` so the dashboard Source filter can group by upload source even
+        # when the caller supplied a full ``extra`` dict (e.g. digital Excel ingests).
+        for _prov_key in ("upload_source", "source_file"):
+            prov_val = lead.get(_prov_key)
+            if prov_val and not extras_dict.get(_prov_key):
+                extras_dict[_prov_key] = str(prov_val)
         extra_json = json.dumps(extras_dict, ensure_ascii=False) if extras_dict else "{}"
         lead_source = lead.get("source", "campaign") or "campaign"
         lead_sandbox = max(1, min(4, int(lead.get("sandbox", 1) or 1)))
@@ -2428,12 +2435,7 @@ def _record_inbound_whatsapp_reply_sync(
         return {"ok": False, "error": "lead not found"}
     lead = _row_to_dict(row)
     role = str(lead.get("role") or "")
-    try:
-        extra = json.loads(lead.get("extra") or "{}")
-    except json.JSONDecodeError:
-        extra = {}
-    if not isinstance(extra, dict):
-        extra = {}
+    extra = coerce_extra_field(lead.get("extra"))
     now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     rtype = (reply_type or "interested").strip().lower()
     extra.update({
@@ -2780,6 +2782,14 @@ def _restore_prompt_version_sync(role: str, version_id: int) -> dict | None:
     try:
         from core import kv_cache
         kv_cache.invalidate_role(role)
+    except Exception:
+        pass
+
+    # Rebuild KB chunks from the restored RAG so the next call does not serve
+    # chunks from the previous version (mirrors update_tuning in console_api).
+    try:
+        from services.chunk_rag import rebuild_role_kb_chunks
+        rebuild_role_kb_chunks(role)
     except Exception:
         pass
 
@@ -3913,6 +3923,19 @@ def _list_stuck_incoming_calls_sync(max_age_minutes: int = 15, limit: int = 25) 
 
 
 # --- Helpers ---
+
+def coerce_extra_field(value) -> dict:
+    """Return `value` as a dict, tolerating already-decoded dicts or JSON strings."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, (str, bytes, bytearray)):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
     out = {key: row[key] for key in row.keys()}

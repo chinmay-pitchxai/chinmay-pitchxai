@@ -12,6 +12,7 @@ from collections.abc import AsyncGenerator
 from typing import Any, Literal
 
 import httpx
+from typing import Optional
 from loguru import logger
 
 from config import settings
@@ -31,7 +32,7 @@ except ImportError:
 _MIME_RATE = re.compile(r"rate=(\d+)", re.I)
 
 # Shared client: keep-alive to generativelanguage.googleapis.com (saves TLS on each TTS).
-_tts_httpx: httpx.Optional[AsyncClient] = None
+_tts_httpx: Optional[httpx.AsyncClient] = None
 
 # In-memory PCM for the standard Vobiz opening line (warmed at startup when possible).
 _default_opening_pcm: tuple[bytes, Optional[int]] = None
@@ -131,7 +132,7 @@ async def gemini_synthesize_pcm(
         },
     }
     # Gemini preview occasionally returns transient 5xx. Retry once before failing.
-    r: httpx.Optional[Response] = None
+    r: Optional[httpx.Response] = None
     for attempt in range(2):
         r = await client.post(url, json=body, timeout=httpx.Timeout(120.0))
         if r.status_code == 200:
@@ -183,7 +184,7 @@ if _PIPECAT_TTS_AVAILABLE:
                 aggregate_sentences=True,
                 **kwargs,
             )
-            self._client: httpx.Optional[AsyncClient] = None
+            self._client: Optional[httpx.AsyncClient] = None
 
         async def start(self, frame):
             await super().start(frame)

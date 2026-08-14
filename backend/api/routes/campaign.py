@@ -169,6 +169,10 @@ async def digital_feed_status():
 
 async def _try_start_campaign_worker(role: str) -> dict:
     """Start dialer for role after upload. Returns status dict (never raises)."""
+    if settings.orchestration_enforce_consent:
+        from core.state import get_campaign_config
+        if not get_campaign_config(role).get("consent_confirmed"):
+            return {"auto_started": False, "blocked": "consent_not_confirmed"}
     from core.orchestration_runtime import ensure_orchestration_running, runtime_status
 
     if runtime_status()["mode"] == "live":
@@ -886,6 +890,55 @@ async def toggle_campaign(request: Request):
         raise HTTPException(status_code=500, detail="Failed to toggle campaign")
 
 
+def _enqueue_pending_lead_jobs(role: str) -> int:
+    """Enqueue now-due FRESH_CALL workflow jobs for pending leads with no active job."""
+    import hashlib
+    from datetime import datetime, timezone
+    from core.orchestration_service import schedule_job
+    from core.storage import _get_conn
+    from core.workflow_models import JobType
+
+    conn = _get_conn()
+    queued = 0
+    try:
+        active = conn.execute(
+            """SELECT lead_id FROM workflow_jobs
+               WHERE status IN ('scheduled','ready','claimed','running')"""
+        ).fetchall()
+        active_ids = {int(r[0]) for r in active}
+        rows = conn.execute(
+            "SELECT id, phone FROM leads WHERE role=? AND status='pending'",
+            (role,),
+        ).fetchall()
+        for row in rows:
+            lead_id = int(row["id"]) if isinstance(row, dict) or hasattr(row, "keys") else int(row[0])
+            phone = str(row["phone"] if (isinstance(row, dict) or hasattr(row, "keys")) else row[1])
+            if lead_id in active_ids:
+                continue
+            phone_key = hashlib.sha256(f"{role}:{phone}".encode("utf-8")).hexdigest()[:20]
+            schedule_job(
+                conn,
+                lead_id=lead_id,
+                job_type=JobType.FRESH_CALL,
+                source="campaign",
+                due_at=datetime.now(timezone.utc),
+                key=f"sandbox1-upload:{phone_key}",
+                attempt=1,
+                source_type="lead_upload",
+                source_id="campaign_start",
+                payload={"sub_sandbox": "1.1"},
+            )
+            queued += 1
+    finally:
+        try:
+            conn.commit()
+        except Exception:
+            pass
+    if queued:
+        logger.info("Start campaign: enqueued {} FRESH_CALL job(s) for role={}", queued, role)
+    return queued
+
+
 @router.post("/start")
 async def start_campaign(request: Request):
     """Start the dialer for this role (**idempotent** — never stops an already-running worker).
@@ -895,6 +948,13 @@ async def start_campaign(request: Request):
     """
     try:
         role = _campaign_role(request)
+        if settings.orchestration_enforce_consent:
+            from core.state import get_campaign_config
+            if not get_campaign_config(role).get("consent_confirmed"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Campaign blocked: consent_confirmed is not set. Confirm TRAI/DND consent in campaign config first.",
+                )
         run = _CAMPAIGN_TASKS.get(role)
         if run and not run.done():
             c = await lead_storage.get_lead_counts(role)
@@ -910,6 +970,12 @@ async def start_campaign(request: Request):
             # Orchestration owns outbound dialing — never start the source-blind
             # legacy worker; just make sure the workflow-queue supervisor is alive.
             await ensure_orchestration_running()
+            # Enqueue now-due FRESH_CALL jobs for any pending lead that has no
+            # active workflow job, so Start Campaign dials immediately (no queue wait).
+            try:
+                await asyncio.to_thread(_enqueue_pending_lead_jobs, role)
+            except Exception as enq_exc:
+                logger.warning("Start campaign: pending-lead enqueue failed: {}", enq_exc)
             c = await lead_storage.get_lead_counts(role)
             return {
                 "status": "started",

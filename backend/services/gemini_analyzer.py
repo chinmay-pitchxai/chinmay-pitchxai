@@ -40,7 +40,7 @@ async def analyze_gemini(transcript_text: str, *, role: str = "") -> dict:
 
     primary = (settings.gemini_call_analysis_model or "gemini-3-flash-preview").strip()
     fallback = (
-        os.getenv("GEMINI_CALL_ANALYSIS_FALLBACK_MODEL") or "gemini-2.5-flash"
+        os.getenv("GEMINI_CALL_ANALYSIS_FALLBACK_MODEL") or "gemini-3.1-flash-lite"
     ).strip()
     models_to_try = [primary]
     if fallback and fallback != primary:

@@ -29,9 +29,18 @@ def get_memory(conn: sqlite3.Connection, lead_id: int) -> dict[str, Any]:
         return {}
     if not row:
         return {}
-    facts = row["facts_json"] if isinstance(row, sqlite3.Row) else row[0]
-    summary = row["summary"] if isinstance(row, sqlite3.Row) else row[2]
-    version = row["version"] if isinstance(row, sqlite3.Row) else row[3]
+    # Work with both sqlite3.Row (name + position) and the Postgres shim's
+    # DictRow (name + position). Positional fallback must map to the SELECT
+    # order above — summary is index 1, version is index 3.
+    def _cell(name: str, index: int):
+        try:
+            return row[name]
+        except (KeyError, IndexError, TypeError):
+            return row[index]
+
+    facts = _cell("facts_json", 0)
+    summary = _cell("summary", 1)
+    version = _cell("version", 3)
     try:
         facts = json.loads(facts or "{}")
     except (ValueError, TypeError):

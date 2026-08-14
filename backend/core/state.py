@@ -181,8 +181,28 @@ def resolved_greeting_text(role: str) -> str:
     if text:
         return text
     from core.opening_line import packaged_fallback_greeting
-
     return packaged_fallback_greeting(role)
+
+
+def resolved_live_language(role: str) -> tuple[str, bool]:
+    """Resolve the voice language + multilingual-mirror flag from role_state.
+
+    Returns (language_code, mirror_enabled). The frontend Configuration page
+    writes these through POST /api/tuning; they are stored in the
+    vobiz_config JSON column. Falls back to GEMINI_LIVE_LANGUAGE (en-IN) and
+    mirror ON (the historical behavior) when nothing is stored.
+    """
+    from config import settings
+
+    default_lang = (settings.gemini_live_language or "en-IN").strip() or "en-IN"
+    try:
+        state = get_state(role)
+        vc = state.get("vobiz") or {}
+        lang = str(vc.get("language") or "").strip() or default_lang
+        mirror = bool(vc.get("multilingual_mirror", True))
+        return lang, mirror
+    except Exception:
+        return default_lang, True
 
 
 def init_state():

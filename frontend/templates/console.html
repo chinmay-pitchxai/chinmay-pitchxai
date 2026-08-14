@@ -6,13 +6,14 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; connect-src 'self' wss:; font-src 'self' https://fonts.gstatic.com;">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#F5F5F7">
+    <link href="/static/favicon.svg" rel="icon" type="image/svg+xml">
     <meta name="vernika-api-root" content="">
     <title>Technopolis Constructions | Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
     <!--VERNIKA_TUNING_SEED-->
-    <link rel="stylesheet" href="/static/css/styles.css?v=2026071401">
+    <link rel="stylesheet" href="/static/css/styles.css?v=20260814">
     <script src="/static/apexcharts.min.js"></script>
     <style>
         .stat-card {
@@ -861,9 +862,9 @@
                 <!-- ── VIZ DATE FILTER ── -->
                 <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:var(--space-md);padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;">
                     <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary);">Filter by Date</span>
-                    <input id="viz-date-from" type="date" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);color-scheme:light;" onchange="onDateFilterChange('viz-date-from')">
+                    <input id="viz-date-from" type="date" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);" onchange="onDateFilterChange('viz-date-from')">
                     <span style="font-size:12px;color:var(--text-secondary);">to</span>
-                    <input id="viz-date-to" type="date" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);color-scheme:light;" onchange="onDateFilterChange('viz-date-to')">
+                    <input id="viz-date-to" type="date" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);" onchange="onDateFilterChange('viz-date-to')">
                     <button class="btn btn-ghost btn-sm" onclick="clearVizDateFilter()" style="font-size:11px;padding:4px 10px;">Clear</button>
                     <span id="viz-date-range-label" style="font-size:11px;color:var(--accent);font-weight:600;margin-left:4px;"></span>
                 </div>
@@ -1168,7 +1169,7 @@
                                 <input type="time" id="filter-time-to" onchange="renderCalls()" style="font-size:11px;padding:4px 6px;border:none;color:var(--text);background:transparent;outline:none;width:auto;" title="To time">
                                 <button class="btn btn-ghost btn-sm" onclick="clearTimeFilters()" title="Clear time filters" style="font-size:10px;padding:2px 6px;margin-left:2px;">Clear</button>
                             </div>
-                            <select id="filter-location" onchange="renderCalls()" style="font-size:11px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);color-scheme:light;min-width:110px;">
+                            <select id="filter-location" onchange="renderCalls()" style="font-size:11px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);min-width:110px;">
                                 <option value="">All Locations</option>
                                 <option value="Mumbai">Mumbai</option>
                                 <option value="Pune">Pune</option>
@@ -1184,7 +1185,7 @@
                                 <option value="Chandigarh">Chandigarh</option>
                                 <option value="Noida">Noida</option>
                             </select>
-                            <select id="filter-budget" onchange="renderCalls()" style="font-size:11px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);color-scheme:light;min-width:110px;">
+                            <select id="filter-budget" onchange="renderCalls()" style="font-size:11px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);min-width:110px;">
                                 <option value="">All Budgets</option>
                                 <option value="30-40 Lakhs">30-40 Lakhs</option>
                                 <option value="40-60 Lakhs">40-60 Lakhs</option>
@@ -1629,7 +1630,7 @@
                                 style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:var(--gray-200);color:var(--text-secondary);padding:4px 10px;border-radius:var(--radius-pill);">Active</span>
                         </div>
                         <textarea id="tuning-prompt"
-                            style="flex:1;min-height:560px;width:100%;font-family:var(--font-mono);font-size:13px;line-height:1.6;resize:none;background:rgba(0,0,0,.04);border-radius:var(--radius-xl);border:1px solid var(--border);"
+                            style="flex:1;min-height:560px;width:100%;font-family:var(--font-mono);font-size:13px;line-height:1.6;resize:none;background:var(--subtle-bg);border-radius:var(--radius-xl);border:1px solid var(--border);"
                             placeholder="Enter agent instructions..."></textarea>
                         <!-- Version history panel (hidden by default) -->
                         <div id="version-history-panel" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
@@ -1668,7 +1669,7 @@
                                 </div>
                             </div>
                             <textarea id="tuning-greeting"
-                                style="width:100%;height:90px;font-size:13px;resize:none;background:var(--gray-100);border:1px solid var(--border);border-radius:var(--radius-xl);padding:12px;color:var(--text);"
+                                style="width:100%;height:90px;font-size:13px;resize:none;background:var(--subtle-bg);border:1px solid var(--border);border-radius:var(--radius-xl);padding:12px;color:var(--text);"
                                 placeholder="First line for this role. Loads from tuning + defaults."></textarea>
                             <p style="font-size:10px;color:var(--text-secondary);margin:8px 0 0;"><strong>Save</strong> stores greeting text. <strong>Capture Live</strong> or the mic icon saves opening PCM in the <strong>same Gemini Live voice</strong> as the call.</p>
                         </div>
@@ -1700,7 +1701,7 @@
                             </div>
                             <div id="rag-dropzone" style="flex:1;display:flex;flex-direction:column;position:relative;">
                                 <textarea id="tuning-rag"
-                                    style="flex:1;min-height:280px;width:100%;font-size:12px;font-family:var(--font-mono);line-height:1.5;resize:none;background:rgba(0,0,0,.02);border:1px solid var(--border);border-radius:10px;padding:14px;color:var(--text);"
+                                    style="flex:1;min-height:280px;width:100%;font-size:12px;font-family:var(--font-mono);line-height:1.5;resize:none;background:var(--subtle-bg);border:1px solid var(--border);border-radius:10px;padding:14px;color:var(--text);"
                                     placeholder="Business intelligence, product info, pricing, FAQs… or drop files here (PDF / DOCX / TXT / MD / CSV / XLSX / JSON)"></textarea>
                                 <div id="rag-drop-overlay"
                                     style="display:none;position:absolute;inset:0;border-radius:10px;border:2px dashed var(--primary);background:rgba(0,0,0,.04);align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--primary);pointer-events:none;">
@@ -1709,7 +1710,7 @@
                             <p style="font-size:10px;color:var(--text-secondary);margin:8px 0 0;">Tip: drop multiple
                                 files — each is appended with a source header so you can see what came from where.</p>
                             <div
-                                style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 12px;background:rgba(0,0,0,.03);border-radius:8px;">
+                                style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 12px;background:var(--subtle-bg);border-radius:8px;">
                                 <span
                                     style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Status</span>
                                 <span id="rag-status-label"

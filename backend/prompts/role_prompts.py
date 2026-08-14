@@ -7,21 +7,41 @@ from loguru import logger
 
 
 def extract_agent_name(role: str) -> str:
-    """Extract agent name from the role's prompt file."""
-    path = os.path.join(os.path.dirname(__file__), f"{role}_prompt.txt")
-    if not os.path.exists(path):
+    """Extract agent name from the role's PROMPT — DB (user-edited config)
+    first, then the packaged prompt file. Callers use this for persona
+    anchors, opening lines and transcripts, so it must reflect what the
+    operator saved in the Configuration page, not a stale file."""
+
+    def _from_text(content: str) -> str:
+        m = re.search(r'##\s*Agent:\s*(.+)', content)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r'You are\s+\*\*(.+?)\*\*', content)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r'\*\*Name:\*\*\s*(.+)', content)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r'You are\s+([A-Z][a-z]+)', content)
+        if m:
+            return m.group(1).strip()
         return ""
-    with open(path, "r", encoding="utf-8") as f:
-        content = f.read()
-    m = re.search(r'##\s*Agent:\s*(.+)', content)
-    if m:
-        return m.group(1).strip()
-    m = re.search(r'You are\s+\*\*(.+?)\*\*', content)
-    if m:
-        return m.group(1).strip()
-    m = re.search(r'\*\*Name:\*\*\s*(.+)', content)
-    if m:
-        return m.group(1).strip()
+
+    try:
+        from core.state import get_state
+
+        db_p = (get_state(role).get("prompt") or "").strip()
+        if db_p:
+            name = _from_text(db_p)
+            if name:
+                return name
+    except Exception:
+        pass
+
+    path = os.path.join(os.path.dirname(__file__), f"{role}_prompt.txt")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return _from_text(f.read())
     return ""
 
 

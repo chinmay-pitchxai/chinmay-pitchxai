@@ -36,6 +36,26 @@ body {
     transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
 }
 
+/* Dark mode form controls (textarea + container surfaces) */
+.dark textarea {
+    background-color: #334155;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+.dark textarea::placeholder,
+.dark input::placeholder,
+.dark select::placeholder {
+    color: #94a3b8;
+}
+.dark .bg-surface-container-lowest {
+    background-color: #1e293b;
+    color: #e2e8f0;
+}
+.dark .bg-surface-container-low {
+    background-color: #1e293b;
+    color: #e2e8f0;
+}
+
 /* Modal Overlay Base */
 .modal-overlay {
     position: fixed;

@@ -25,6 +25,18 @@ _CAMPAIGN_ROLES = ("sales_1",)
 _EMAIL_WA_PREFILL = "Hi, I'm interested in Solitaire Unity. Please share more details."
 
 
+def _is_plausible_e164(norm: str) -> bool:
+    """Real WhatsApp sender numbers are always valid E.164; reject test/bogus senders."""
+    try:
+        import phonenumbers
+        parsed = phonenumbers.parse(norm, None)
+        return phonenumbers.is_valid_number(parsed)
+    except Exception:
+        # Fallback: E.164 max 15 digits, plausible min 7.
+        digits = "".join(ch for ch in (norm or "") if ch.isdigit())
+        return 7 <= len(digits) <= 15
+
+
 def resolve_whatsapp_business_number() -> str:
     """Business WhatsApp line for wa.me links (not VoIP outbound dialer numbers)."""
     return (settings.botspice_whatsapp_number or settings.whatsapp_business_number or "").strip()
@@ -55,6 +67,8 @@ async def upsert_dariaan_lead_from_whatsapp(
     norm = _norm_phone_str(from_phone)
     if not norm:
         raise ValueError(f"Invalid WhatsApp sender phone: {from_phone!r}")
+    if not _is_plausible_e164(norm):
+        raise ValueError(f"Implausible WhatsApp sender phone (not dialable E.164): {from_phone!r}")
     display_name = (profile_name or "").strip() or "WhatsApp Lead"
     now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     wa_meta = {
@@ -154,8 +168,14 @@ def _classify_inbound_reply(message_text: str) -> tuple[str, str]:
     if not text:
         return "", ""
     low = text.lower()
-    if "not interested" in low or "no thanks" in low or "stop" in low:
-        return "", ""
+    if (
+        "not interested" in low or "no thanks" in low or "stop" in low
+        or "don't call" in low or "dont call" in low or "do not call" in low
+        or "no more" in low or "remove me" in low or "unsubscribe" in low
+    ):
+        # Blue Loop branching (plan Phase 6): a second 'not interested' is a
+        # terminal LOST / Do-Not-Call — surface it so the caller can opt out.
+        return "not_interested", "whatsapp"
 
     if _EMAIL_WA_PREFILL.lower() in low or "interested in solitaire unity" in low:
         return "interested", "email_whatsapp"
@@ -207,8 +227,9 @@ async def process_campaign_whatsapp_reply(
     now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     try:
-        extra = json.loads(lead.get("extra") or "{}")
-    except json.JSONDecodeError:
+        raw_extra = lead.get("extra")
+        extra = json.loads(raw_extra) if isinstance(raw_extra, (str, bytes, bytearray)) else raw_extra
+    except (json.JSONDecodeError, TypeError):
         extra = {}
     if not isinstance(extra, dict):
         extra = {}
@@ -228,6 +249,33 @@ async def process_campaign_whatsapp_reply(
     conn.commit()
 
     reply_type, source = _classify_inbound_reply(message_text)
+    if reply_type == "not_interested":
+        # Blue Loop branching (plan Phase 6): 'not interested again' is
+        # terminal — LOST / Do Not Call. Halt all automated communication.
+        try:
+            from core.orchestration_service import opt_out
+
+            opt_out(conn, lead_id, reason="not interested (WhatsApp)", source_interaction=f"whatsapp:{wa_message_id or 'unknown'}")
+            logger.info("WhatsApp 'not interested' -> lead {} opted out / LOST", lead_id)
+        except Exception as exc:
+            logger.warning("WhatsApp opt-out failed for lead {}: {}", lead_id, exc)
+        try:
+            from core.events import get_event_bus
+            await get_event_bus().publish("lead_updated", role=role, lead_id=lead_id)
+        except Exception:
+            pass
+        return {
+            "matched": True,
+            "interested": False,
+            "callback": False,
+            "not_interested": True,
+            "reply_type": "not_interested",
+            "lead_id": lead_id,
+            "role": role,
+            "source": source,
+            "status": "opted_out",
+        }
+
     if reply_type in ("interested", "callback"):
         result = await record_inbound_whatsapp_reply(
             lead_id,
@@ -280,6 +328,11 @@ async def process_whatsapp_inbound(
     """Route inbound WhatsApp: campaign lead reply first, else Dariaan ingest."""
     if not settings.whatsapp_inbound_leads_enabled:
         return {"ignored": True, "reason": "WHATSAPP_INBOUND_LEADS_ENABLED=0"}
+
+    norm = _norm_phone_str(from_phone)
+    if not _is_plausible_e164(norm):
+        logger.warning("Skipping inbound WhatsApp from implausible sender number: {}", from_phone)
+        return {"ignored": True, "reason": "sender_number_not_dialable", "from_phone": from_phone}
 
     campaign = await process_campaign_whatsapp_reply(
         from_phone=from_phone,

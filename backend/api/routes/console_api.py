@@ -51,6 +51,16 @@ from core.phone_norm import norm_phone_str
 from core.greeting_pcm import load_recorded_greeting_pcm
 from core.storage import insert_manual_call, mark_manual_call_failed
 from core.utils import _build_opening_line
+
+
+def extract_role(request: Request) -> str:
+    """Resolve the console role from query params, headers, or the default."""
+    return str(
+        (request.query_params.get("role") or "").strip()
+        or (request.headers.get("X-User-Role") or "").strip()
+        or (request.headers.get("X-Role") or "").strip()
+        or "sales_1"
+    )
 from core.greeting_pcm import ensure_opening_pcm, ensure_name_verify_pcm_for_call
 from services.call_recording import (
     fetch_vobiz_recording_if_missing,
@@ -341,15 +351,21 @@ async def get_tuning(request: Request):
     gt = coerce_stored_greeting(role, state.get("greeting_text"))
     greeting = gt if gt else packaged_fallback_greeting(role)
 
-    # Include P1-P9 phone numbers from state (fallback to empty)
+    # Include P1-P9 phone numbers from state (fallback to server .env so the
+    # UI always shows the numbers actually used by the call allocator)
     result = {
         "role": role,
         "prompt": prompt,
         "rag": rag,
         "greeting_text": greeting
     }
+    from core.state import resolved_live_language
+
+    _lang, _mirror = resolved_live_language(role)
+    result["language"] = _lang
+    result["multilingual_mirror"] = _mirror
     for i in range(1, 10):
-        result[f"p{i}_number"] = state.get(f"p{i}_number", "") or ""
+        result[f"p{i}_number"] = state.get(f"p{i}_number", "") or getattr(settings, f"p{i}_number", "") or ""
     return result
 
 class TuningUpdate(BaseModel):
@@ -365,6 +381,9 @@ class TuningUpdate(BaseModel):
     p7_number: str = ""
     p8_number: str = ""
     p9_number: str = ""
+    # Voice & language plug-and-play (mirrors Gemini Live languageCode + prompt)
+    language: str = ""            # primary language code, e.g. "te-IN" (Telugu)
+    multilingual_mirror: bool = True  # mirror the caller's language when different
 
 @router.post("/api/tuning")
 async def update_tuning(data: TuningUpdate, request: Request):
@@ -378,29 +397,79 @@ async def update_tuning(data: TuningUpdate, request: Request):
     from core.greeting_text_utils import coerce_stored_greeting
     from core.role_sandbox import validate_role_tuning
 
+    # Only fields the client actually sent are touched — a partial save (e.g.
+    # just language + mirror) must NEVER blank the prompt/RAG/greeting. The
+    # frontend always sends the full form, but API probes and other tools may
+    # send a subset; treating absent fields as "keep current" is the safe
+    # production behavior.
+    raw_body = request._body if hasattr(request, "_body") else b""
+    import json as _json
+
+    sent_keys: set[str] = set()
+    try:
+        sent_keys = set(_json.loads(raw_body or b"{}").keys()) if raw_body else set()
+    except Exception:
+        pass
+    if not sent_keys:
+        try:
+            import inspect
+
+            body_data = await request.body()
+            sent_keys = set(_json.loads(body_data or b"{}").keys())
+        except Exception:
+            sent_keys = set()
+
+    # Resolve current state for keep-current fallback of untouched fields
+    from core.state import get_state
+
+    _cur = get_state(role)
+
+    def _field(field_name: str) -> str:
+        if sent_keys and field_name in sent_keys:
+            return str(getattr(data, field_name, "") or "")
+        return str(_cur.get(field_name) or "")
+
+    prompt_val = _field("prompt")
+    rag_val = _field("rag")
+    greeting_val = _field("greeting_text")
+
     tuning_err = validate_role_tuning(
         role,
-        prompt=data.prompt or "",
-        rag=data.rag or "",
-        greeting=data.greeting_text or "",
+        prompt=prompt_val,
+        rag=rag_val,
+        greeting=greeting_val,
     )
     if tuning_err:
         raise HTTPException(400, tuning_err)
 
-    greeting_out = coerce_stored_greeting(role, data.greeting_text or "")
+    greeting_out = coerce_stored_greeting(role, greeting_val)
     # Collect P1-P9 phone numbers from request
     phone_nums = {}
     for i in range(1, 10):
         val = getattr(data, f"p{i}_number", "") or ""
         phone_nums[f"p{i}_number"] = val.strip()
-    save_role_state(role, prompt=data.prompt, rag=data.rag, greeting_text=greeting_out, **phone_nums)
+    save_role_state(role, prompt=prompt_val, rag=rag_val, greeting_text=greeting_out, **phone_nums)
+
+    # Persist voice/language plug-and-play inside vobiz_config (JSON column —
+    # no schema migration needed). The live Gemini session resolves the
+    # language from role_state first, falling back to GEMINI_LIVE_LANGUAGE.
+    try:
+        _st = get_state(role)
+        vc = dict(_st.get("vobiz") or {})
+        if sent_keys and "language" in sent_keys:
+            vc["language"] = (data.language or "").strip()
+        if sent_keys and "multilingual_mirror" in sent_keys:
+            vc["multilingual_mirror"] = bool(data.multilingual_mirror)
+        save_role_state(role, vobiz_config=vc)
+    except Exception as exc:
+        logger.warning("language config save failed (non-fatal): {}", exc)
 
     # Keep prompt + KB files in sync — build_role_system_prompt() prefers non-empty DB,
     # then falls back to these files when the DB field is empty.
     from prompts.role_prompts import set_role_prompt_text, set_role_rag_source_text
 
-    set_role_prompt_text(role, data.prompt)
-    set_role_rag_source_text(role, data.rag)
+    set_role_prompt_text(role, prompt_val)
+    set_role_rag_source_text(role, rag_val)
 
     # Live RAG reads kb_chunks.json — regenerate + drop the cached chunks so the
     # dashboard edit is picked up by the next call immediately.
@@ -430,8 +499,8 @@ async def update_tuning(data: TuningUpdate, request: Request):
         from core.storage import save_prompt_version
         ver = await save_prompt_version(
             role=role,
-            prompt=data.prompt or "",
-            rag=data.rag or "",
+            prompt=prompt_val,
+            rag=rag_val,
             greeting_text=greeting_out or "",
             status="active",
         )
@@ -538,17 +607,18 @@ async def run_gemini_transcription(
     mime_type = "audio/wav" if audio_file.suffix.lower() == ".wav" else "audio/mpeg"
 
     # Load transcription prompt from DB
-    from prompts.role_prompts import get_role_prompt_text
+    from prompts.role_prompts import extract_agent_name, get_role_prompt_text
+    agent_name = extract_agent_name(role) or "Vernika"
     trans_prompt = get_role_prompt_text(f"{role}_transcription")
     if not trans_prompt:
         trans_prompt = (
             "You are processing a recorded Indian real-estate sales telephone call.\n\n"
             "Generate a highly accurate verbatim transcript.\n"
-            "Identify speakers as AGENT and CUSTOMER.\n"
+            f"Label the sales agent speaker as {agent_name} (never AGENT) and the other party as user (never CUSTOMER).\n"
             "Preserve the language actually spoken — Telugu, English, Tenglish, Hindi, Hinglish.\n"
             "Do NOT automatically translate the conversation.\n"
             "If a section is unintelligible, mark [unclear].\n"
-            "Do not turn the transcript into a summary. Do not correct the customer's meaning.\n"
+            "Do not turn the transcript into a summary. Do not correct the user's meaning.\n"
             "Preserve numbers, names, prices, dates, and appointment times carefully.\n"
             "Output a chronological transcript with speaker attribution."
         )
@@ -560,7 +630,7 @@ async def run_gemini_transcription(
 
     from core.gemini_auth import gemini_auth_headers, gemini_generate_content_url
 
-    model = (settings.gemini_transcription_model or "gemini-2.5-flash").strip()
+    model = (settings.gemini_transcription_model or "gemini-3.1-flash-lite").strip()
     url = gemini_generate_content_url(model)
 
     payload = {
@@ -613,21 +683,35 @@ async def run_gemini_transcription(
     return result
 
 
-def _parse_transcript_utterances(text: str) -> list[dict]:
-    """Parse transcript text into structured utterances with speaker labels."""
+def _parse_transcript_utterances(text: str, role: str = "sales_1") -> list[dict]:
+    """Parse transcript text into structured utterances with speaker labels.
+
+    Accepts AGENT/CUSTOMER (legacy) plus agent-name/user labels and maps them
+    to the canonical {agent_name, user} speaker set the dashboard renders.
+    """
     import re
+
+    from prompts.role_prompts import extract_agent_name
+
+    agent_name = extract_agent_name(role) or "Vernika"
     utterances = []
     lines = (text or "").strip().split("\n")
+    label_re = re.compile(r"^(.*?)[:\s-]+(.+)$")
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        m = re.match(r"^(AGENT|CUSTOMER|Agent|Customer)[:\s-]+(.+)", line)
+        m = label_re.match(line)
         if m:
-            utterances.append({
-                "speaker": m.group(1).lower(),
-                "text": m.group(2).strip(),
-            })
+            raw = m.group(1).strip().lower()
+            body = m.group(2).strip()
+            if raw in ("agent", "assistant", "sales", "vernika", "siri", "ai") or agent_name.lower() in raw:
+                speaker = "agent"
+            elif raw in ("customer", "caller", "client", "user", "lead"):
+                speaker = "user"
+            else:
+                speaker = "unknown"
+            utterances.append({"speaker": speaker, "text": body})
         else:
             utterances.append({"speaker": "unknown", "text": line})
     return utterances
@@ -636,6 +720,35 @@ def _parse_transcript_utterances(text: str) -> list[dict]:
 import os
 class GreetingTextBody(BaseModel):
     greeting_text: str = ""
+
+
+@router.get("/api/greeting/status")
+async def greeting_status(request: Request):
+    """Return the pre-recorded greeting audio status (ready, duration, source)."""
+    role = _role_from_request(request)
+    from core.greeting_pcm import greeting_pcm_paths, load_recorded_greeting_pcm
+    from core.state import resolved_greeting_text
+
+    greet = resolved_greeting_text(role)
+    rec = load_recorded_greeting_pcm(role, greeting_text=greet)
+    if rec:
+        pcm, sr = rec
+        pcm_path, meta_path = greeting_pcm_paths(role)
+        meta: dict = {}
+        try:
+            import json as _json
+            meta = _json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        return {
+            "ready": True,
+            "duration_sec": round(len(pcm) / 2 / max(1, sr), 2),
+            "bytes": len(pcm),
+            "source": meta.get("source") or "recorded",
+            "voice": meta.get("voice") or "",
+            "model": meta.get("model") or "",
+        }
+    return {"ready": False, "duration_sec": 0, "bytes": 0, "source": "", "voice": ""}
 
 
 @router.post("/api/tuning/record-greeting")
@@ -790,25 +903,103 @@ async def upload_doc(request: Request, file: UploadFile = File(...)):
 
     return {"status": "ok", "filename": file.filename, "extracted_length": len(text)}
 
+class VobizAccount(BaseModel):
+    """One Vobiz trunk: auth id + token (+ optional label)."""
+    name: str = "Default"
+    auth_id: str = ""
+    auth_token: str = ""
+
+
 class VobizUpdate(BaseModel):
-    auth_id: str
-    auth_token: str
-    from_number: str
-    public_url: str
+    auth_id: str = ""
+    auth_token: str = ""
+    from_number: str = ""
+    public_url: str = ""
+    accounts: list[VobizAccount] = []
+    phone_numbers: list[str] = []
+
+
+@router.get("/api/settings/vobiz")
+async def get_vobiz_config(request: Request):
+    """Return the current Vobiz config for the role (auth accounts, webhook, numbers)."""
+    role = _role_from_request(request)
+    state = get_state(role)
+    vobiz_config = state.get("vobiz", {}) if isinstance(state.get("vobiz"), dict) else {}
+
+    # Single legacy account fields
+    accounts = list(vobiz_config.get("accounts") or [])
+    if not accounts:
+        legacy = {
+            "name": "Default",
+            "auth_id": str(vobiz_config.get("auth_id") or ""),
+            "auth_token": str(vobiz_config.get("auth_token") or ""),
+        }
+        if legacy["auth_id"] or legacy["auth_token"]:
+            accounts.append(legacy)
+
+    # Webhook = public answer URL for this deployment
+    from core.vobiz_credentials import _normalize_vobiz_public_url
+    webhook = _normalize_vobiz_public_url(
+        str(vobiz_config.get("public_url") or ""),
+        settings.vobiz_public_base_url,
+        settings.server_url,
+    )
+
+    result = {
+        "role": role,
+        "accounts": accounts,
+        "webhook_url": f"{webhook.rstrip('/')}/vobiz/answer" if webhook else "",
+        "inbound_webhook_url": f"{webhook.rstrip('/')}/vobiz/incoming" if webhook else "",
+        "public_url": webhook,
+        "from_number": str(vobiz_config.get("from_number") or ""),
+        "phone_numbers": [n for n in (vobiz_config.get("phone_numbers") or []) if n],
+        "has_env_override": bool(
+            (settings.vobiz_sales_1_auth_id or "").strip()
+            and (settings.vobiz_sales_1_auth_token or "").strip()
+        ),
+    }
+    for i in range(1, 10):
+        result[f"p{i}_number"] = state.get(f"p{i}_number", "") or getattr(settings, f"p{i}_number", "") or ""
+    return result
+
 
 @router.post("/api/settings/vobiz")
 async def update_vobiz(data: VobizUpdate, request: Request):
     role = _role_from_request(request)
     state = get_state(role)
-    vobiz_config = state.get("vobiz", {})
-    vobiz_config.update({
-        "auth_id": data.auth_id,
-        "auth_token": data.auth_token,
-        "from_number": data.from_number,
-        "public_url": data.public_url
-    })
+    vobiz_config = state.get("vobiz", {}) if isinstance(state.get("vobiz"), dict) else {}
+
+    if data.accounts:
+        # Multi-account mode: store the whole list; first account is the active one.
+        cleaned = [
+            {
+                "name": (a.name or "Default").strip() or "Default",
+                "auth_id": (a.auth_id or "").strip(),
+                "auth_token": (a.auth_token or "").strip(),
+            }
+            for a in data.accounts
+        ]
+        vobiz_config["accounts"] = cleaned
+        active = cleaned[0]
+        vobiz_config["auth_id"] = active["auth_id"]
+        vobiz_config["auth_token"] = active["auth_token"]
+    else:
+        # Legacy single-account mode
+        vobiz_config["auth_id"] = (data.auth_id or "").strip()
+        vobiz_config["auth_token"] = (data.auth_token or "").strip()
+
+    if data.from_number:
+        vobiz_config["from_number"] = (data.from_number or "").strip()
+    if data.public_url:
+        vobiz_config["public_url"] = (data.public_url or "").strip()
+    if data.phone_numbers is not None:
+        # Extra dial-able numbers (beyond P1-P9): used by the allocator for
+        # round-robin dialing via get_all_outbound_numbers().
+        cleaned_numbers = [(n or "").strip() for n in data.phone_numbers]
+        vobiz_config["phone_numbers"] = [n for n in cleaned_numbers if n]
+
     save_role_state(role, vobiz_config=vobiz_config)
-    return {"status": "ok"}
+    return {"status": "ok", "role": role, "accounts": vobiz_config.get("accounts", [])}
 
 class ManualCallReq(BaseModel):
     to: str

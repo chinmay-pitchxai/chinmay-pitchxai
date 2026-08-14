@@ -73,6 +73,62 @@ def clear_history(phone: str) -> None:
     conn.commit()
 
 
+_VISIT_KEYWORDS = (
+    "visit", "schedule", "willing", "tomorrow", "weekend", "come see",
+    "see the site", "see site", "visit the site", "visit site",
+)
+_NOT_INTERESTED_PHRASES = (
+    "not interested", "no thanks", "no thank you", "don't want", "dont want",
+    "no more", "remove me", "unsubscribe", "stop", "don't call", "dont call",
+    "do not call", "no need",
+)
+
+
+def _detect_site_visit_intent(message_text: str) -> bool:
+    """Deterministic direct-booking bypass check (plan Phase 6).
+
+    Works without Gemini so a willing-to-visit reply is honored even when the
+    API key is missing or the API call fails.
+    """
+    low = (message_text or "").lower()
+    if any(p in low for p in _NOT_INTERESTED_PHRASES):
+        return False
+    return any(k in low for k in _VISIT_KEYWORDS)
+
+
+async def _apply_site_visit_bypass(phone: str, message_text: str) -> None:
+    """Route a willing-to-visit WhatsApp reply straight to the Site Visit state.
+
+    Cancels pending WhatsApp nudge / no-reply follow-up jobs so no further
+    automation runs after the direct booking (plan Phase 6 'Direct Booking
+    Bypass').
+    """
+    try:
+        from core.storage import find_lead_by_phone_any_role, _get_conn
+
+        lead = await find_lead_by_phone_any_role(phone)
+        if not lead:
+            return
+        conn = _get_conn()
+        conn.execute(
+            "UPDATE leads SET status='site_visit',"
+            "lifecycle_status='site_visit_scheduled', sandbox=3,"
+            "updated_at=datetime('now') WHERE id=?",
+            (int(lead["id"]),),
+        )
+        conn.execute(
+            "UPDATE workflow_jobs SET status='cancelled',"
+            "error='Site visit agreed on WhatsApp',updated_at=datetime('now')"
+            " WHERE lead_id=? AND job_type IN ('whatsapp_followup_24h','interested_followup')"
+            "  AND status IN ('scheduled','ready','claimed')",
+            (int(lead["id"]),),
+        )
+        conn.commit()
+        logger.info("Lead {} transitioned to site visit via WhatsApp", phone)
+    except Exception as err:
+        logger.error("Failed to update lead status on WhatsApp site visit reply: {}", err)
+
+
 async def analyze_inbound_message(
     phone: str,
     message_text: str,
@@ -85,6 +141,19 @@ async def analyze_inbound_message(
     """
     history = get_history(phone)
     history.append({"role": "user", "message": message_text})
+
+    # Deterministic direct-booking bypass first (plan Phase 6): a clear
+    # willing-to-visit reply is honored even without Gemini. Only "not
+    # interested" style negations suppress it.
+    if _detect_site_visit_intent(message_text):
+        await _apply_site_visit_bypass(phone, message_text)
+        return {
+            "should_respond": True,
+            "intent": "site_visit",
+            "response": "",
+            "send_project_details": True,
+            "site_visit_agreed": True,
+        }
 
     rag_block = ""
     try:
@@ -113,7 +182,7 @@ async def analyze_inbound_message(
         logger.warning("WhatsApp conversation: GEMINI_API_KEY not set, skipping analysis")
         return _no_response()
 
-    model = (settings.gemini_call_analysis_model or "gemini-2.5-flash").strip()
+    model = (settings.gemini_call_analysis_model or "gemini-3.1-flash-lite").strip()
     url = gemini_generate_content_url(model)
 
     contents = []

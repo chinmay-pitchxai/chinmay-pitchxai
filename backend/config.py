@@ -92,7 +92,7 @@ class Settings:
     gemini_api_key_fallback: str = (os.getenv("GEMINI_API_KEY_FALLBACK") or "").strip()
     # Post-call transcript analysis (REST generateContent). Override with GEMINI_CALL_ANALYSIS_MODEL.
     gemini_call_analysis_model: str = os.getenv(
-        "GEMINI_CALL_ANALYSIS_MODEL", "gemini-2.5-flash"
+        "GEMINI_CALL_ANALYSIS_MODEL", "gemini-3.1-flash-lite"
     ).strip()
     gemini_call_analysis_temperature: float = float(
         os.getenv("GEMINI_CALL_ANALYSIS_TEMPERATURE", "0.1")
@@ -102,7 +102,7 @@ class Settings:
     )
     # Post-call audio transcription (mixed recording → JSON turns). Separate from live STT.
     gemini_transcription_model: str = os.getenv(
-        "GEMINI_TRANSCRIPTION_MODEL", "gemini-2.5-flash"
+        "GEMINI_TRANSCRIPTION_MODEL", "gemini-3.1-flash-lite"
     ).strip()
     gemini_transcription_temperature: float = float(
         os.getenv("GEMINI_TRANSCRIPTION_TEMPERATURE", "0.0")
@@ -156,6 +156,19 @@ class Settings:
     orchestration_live_enabled: bool = _b("ORCHESTRATION_LIVE_ENABLED", False)
     orchestration_lease_seconds: float = float(os.getenv("ORCHESTRATION_LEASE_SECONDS", "300"))
     orchestration_poll_seconds: float = float(os.getenv("ORCHESTRATION_POLL_SECONDS", "1.0"))
+    # Number of concurrent queue dispatcher workers (PostgreSQL is multi-writer;
+    # safe >1. 1 keeps single-writer semantics for legacy SQLite fallback.)
+    orchestration_worker_count: int = int(os.getenv("ORCHESTRATION_WORKER_COUNT", "2"))
+    # Anti-spam rest interval (seconds) between consecutive dials on a phone
+    # line, per plan Phase 4 "Spam Buffer" (10-15 s). 0 disables.
+    orchestration_inter_call_gap_sec: float = float(os.getenv("ORCHESTRATION_INTER_CALL_GAP_SEC", "15"))
+    # Working business-hours window (plan Phase 3: 11:00-19:30 Asia/Kolkata).
+    orchestration_business_tz: str = os.getenv("ORCHESTRATION_BUSINESS_TZ", "Asia/Kolkata").strip()
+    orchestration_work_start: str = os.getenv("ORCHESTRATION_WORK_START", "11:00").strip()
+    orchestration_work_end: str = os.getenv("ORCHESTRATION_WORK_END", "19:30").strip()
+    # If true, block campaign start when campaign config has consent_confirmed=false
+    # (TRAI/DND consent gate). Default off to preserve existing behavior.
+    orchestration_enforce_consent: bool = _b("ORCHESTRATION_ENFORCE_CONSENT", False)
     # Continuously ingest a locally synced Excel/CSV file as Sandbox 1.2
     # digital leads. The file can be maintained by Excel/OneDrive; only new
     # phone numbers are inserted and each receives one idempotent P3 job.

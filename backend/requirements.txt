@@ -20,3 +20,4 @@ xlrd
 rapidfuzz==3.9.7
 tzdata; platform_system == "Windows"
 psycopg2-binary==2.9.9
+phonenumbers

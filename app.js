@@ -11,6 +11,7 @@
         currentSandbox: 1,        // Sandboxes 1-4 (dashboard)
         campaignSandbox: 1,       // Selected sandbox for campaigns view
         currentFilter: 'all',     // Table filter
+        currentSource: 'all',     // Upload-source / broker filter ('all' or a source key)
         tableSearch: '',          // Table search query
         allLeads: [],
         inboundCallbacks: [],
@@ -273,7 +274,8 @@
     // Lead fields the UI expects (kept in sync with backend /api/dashboard/leads):
     // id, name, phone, email, company, segment, status, disposition, error,
     // rating, summary, transcript, duration_sec, created_at, start_time,
-    // called_at_iso, sandbox, whatsapp_sent, site_visit_scheduled.
+    // called_at_iso, sandbox, whatsapp_sent, site_visit_scheduled,
+    // upload_source, broker_id, extra.
     function normalizeApiLead(l) {
         return {
             id: l.id,
@@ -294,14 +296,83 @@
             called_at_iso: l.called_at_iso || null,
             sandbox: l.sandbox || 1,
             whatsapp_sent: !!l.whatsapp_sent,
-            site_visit_scheduled: !!l.site_visit_scheduled
+            site_visit_scheduled: !!l.site_visit_scheduled,
+            upload_source: l.upload_source || "",
+            broker_id: l.broker_id || "",
+            extra: (l.extra && typeof l.extra === 'object') ? l.extra : {}
         };
     }
 
-    // Set sandbox filter for leads view (0=all, 1-4=specific sandbox)
+    // --- Upload-source / broker dimension ---
+    // Canonical source key per lead: upload file name (broker1.xlsx / broker2.csv),
+    // google sheet broker (google:broker_1..3), or 'manual' for everything else.
+    window.leadSourceKey = function(l) {
+        if (l.upload_source) return l.upload_source;
+        if (l.broker_id) return 'google:' + l.broker_id;
+        return 'manual';
+    };
+
+    window.leadSourceLabel = function(key) {
+        if (!key || key === 'all') return 'All Sources';
+        if (key === 'manual') return 'Manual';
+        if (key.indexOf('google:') === 0) return 'Google Sheet ' + key.slice(7);
+        return key;
+    };
+
+    window.leadSourceOf = function(l) {
+        return window.leadSourceLabel(window.leadSourceKey(l));
+    };
+
+    // Rebuild the Source <select> options from the distinct sources present in the
+    // loaded leads, preserving the currently active selection.
+    window.populateSourceFilter = function() {
+        const sel = document.getElementById('filter-source');
+        if (!sel) return;
+        const seen = new Set(['all']);
+        window.appState.allLeads.forEach(l => seen.add(window.leadSourceKey(l)));
+        const keys = Array.from(seen).sort();
+        sel.innerHTML = keys.map(k =>
+            `<option value="${k}">${window.leadSourceLabel(k)}</option>`
+        ).join('');
+        sel.value = window.appState.currentSource || 'all';
+    };
+
+    // Canonical entry point for the Source filter: mirrors filterBySandbox/filterFromKpi.
+    window.filterBySource = function(source) {
+        window.appState.currentSource = source || 'all';
+        window.populateSourceFilter();
+        window.updateDashboardUI();           // KPIs + charts + table
+        if (window.showToast) {
+            window.showToast(
+                window.appState.currentSource === 'all'
+                    ? 'Showing all upload sources.'
+                    : 'Filtering by ' + window.leadSourceLabel(window.appState.currentSource) + '.',
+                'info'
+            );
+        }
+    };
+
+    // Set sandbox filter for leads view (0=all, 1-4=specific sandbox).
+    // Also drives the KPI cards / donut / charts so every dashboard widget
+    // reflects the SAME active sandbox (plan §4 manual check #2).
+    // Funnel stage click → jump to the Campaigns view with that sandbox tab.
+    window.openSandboxCampaign = function(num) {
+        if (window.switchView) window.switchView('campaigns');
+        if (window.selectCampaignTab) window.selectCampaignTab(num);
+        window.showToast && window.showToast(`Opened Sandbox ${num} campaign`, 'info');
+    };
+
     window.setSandboxFilter = function(num) {
         currentSandboxFilter = num;
-        window.loadRealLeads();
+        if (window.appState) {
+            window.appState.currentSandbox = num;
+        }
+        window.loadRealLeads().then(() => {
+            window.updateDashboardUI();
+        });
+        if (typeof window.refreshDashboardStats === 'function') {
+            window.refreshDashboardStats();
+        }
     };
 
     window.loadRealLeads = async function() {
@@ -317,6 +388,7 @@
             if (leads.length > 0) {
                 window.appState.allLeads = leads.map(normalizeApiLead);
                 window.appState.inboundCallbacks = leads.filter(l => l.status === 'inbound').map(normalizeApiLead);
+                window.populateSourceFilter();
                 return true;
             }
         } catch (e) {
@@ -409,7 +481,16 @@
 
     // --- Re-calculate KPIs ---
     window.calculateKpis = function() {
-        const sandboxLeads = window.appState.allLeads.filter(l => l.sandbox === window.appState.currentSandbox);
+        // currentSandbox 0 = aggregate across ALL sandboxes; 1-4 = one sandbox.
+        const activeSb = window.appState.currentSandbox;
+        let sandboxLeads = activeSb
+            ? window.appState.allLeads.filter(l => l.sandbox === activeSb)
+            : window.appState.allLeads;
+        // Upload-source / broker filter composes with the sandbox scope so KPI
+        // cards always agree with the call-log table (e.g. 'broker1.xlsx' only).
+        if (window.appState.currentSource && window.appState.currentSource !== 'all') {
+            sandboxLeads = sandboxLeads.filter(l => window.leadSourceKey(l) === window.appState.currentSource);
+        }
         const calledLeads = sandboxLeads.filter(isCalled);
         
         const total = sandboxLeads.length;
@@ -452,6 +533,14 @@
          setDomText('sb3-count', sandboxCounts[3]||0);
          setDomText('sb4-count', sandboxCounts[4]||0);
 
+         // Sales Funnel stages (SB1..SB4 totals + site visits). Clicking a stage
+         // filters the dashboard to that sandbox.
+         setDomText('funnel-sb1', sandboxCounts[1]||0);
+         setDomText('funnel-sb2', sandboxCounts[2]||0);
+         setDomText('funnel-sb3', sandboxCounts[3]||0);
+         setDomText('funnel-sb4', sandboxCounts[4]||0);
+         setDomText('funnel-sv', siteVisitCount);
+
          // Update Global state for kpi_modal access
          window.allLeads = sandboxLeads;
          window.lastCampaignSnapshot.texts['stat-called'] = called.toString();
@@ -461,9 +550,65 @@
 
          return {
              total, called, interested, convRate,
-             whatsapp, siteVisit, notInterested, callbacks, avgRating
+             whatsapp, siteVisit, notInterested, callbacks, avgRating,
+             trends: window._computeKpiTrends(sandboxLeads),
          };
-    };
+         };
+
+         // Real 7-day deltas: this week (last 7 days) vs previous week (days 8-14 back).
+         // Timestamp resolution order: called_at_iso (actual call time) → called_at →
+         // created_at (lead creation time, epoch seconds from the API) → created_at_iso/added_at.
+         // Leads freshly uploaded have no called_at yet, so we fall back to creation
+         // time so the trend shows a real % (leads added this week vs last week).
+         // When even that baseline is missing (0 in previous window) we report 0%
+         // with a flat trend instead of a permanent '—', so the cards never lie.
+         window._computeKpiTrends = function(leads) {
+         const now = new Date();
+         const weekAgo = now.getTime() - 7 * 86400_000;
+         const twoWeeksAgo = now.getTime() - 14 * 86400_000;
+
+         // Normalize any timestamp shape to epoch ms (ISO string, epoch secs, epoch ms).
+         const toMs = v => {
+             if (v === null || v === undefined || v === 0 || v === '' || v === '—') return null;
+             if (typeof v === 'number') return v < 1e12 ? v * 1000 : v; // epoch seconds → ms
+             const t = new Date(v).getTime();
+             return Number.isFinite(t) ? t : null;
+         };
+         const calledAt = l => {
+             const ms = toMs(l.called_at_iso) ?? toMs(l.called_at) ?? toMs(l.created_at)
+                 ?? toMs(l.created_at_iso) ?? toMs(l.added_at);
+             return ms;
+         };
+
+         const counts = {
+             total: [0, 0],
+             called: [0, 0],
+             interested: [0, 0],
+         };
+         for (const l of leads) {
+             const t = calledAt(l);
+             if (t === null) continue;
+             const bucket = t >= twoWeeksAgo && t < weekAgo ? 1 : (t >= weekAgo ? 0 : -1);
+             if (bucket < 0) continue;
+             counts.total[bucket]++;
+             if (isCalled(l)) counts.called[bucket]++;
+             if (l.disposition === 'Interested') counts.interested[bucket]++;
+         }
+
+         // No baseline in the previous window → 0% flat (never a permanent '—').
+         const pct = (cur, prev) => {
+             if (prev <= 0) return 0;
+             return Math.round(((cur - prev) / prev) * 100);
+         };
+         // Conversion = interested/called rate per window; relative delta between windows.
+         const convRate = b => counts.called[b] > 0 ? (counts.interested[b] / counts.called[b]) * 100 : 0;
+         return {
+             total: pct(counts.total[0], counts.total[1]),
+             called: pct(counts.called[0], counts.called[1]),
+             interested: pct(counts.interested[0], counts.interested[1]),
+             conversion: pct(convRate(0), convRate(1)),
+         };
+         };
 
     // --- Update Dashboard DOM ---
     window.updateDashboardUI = function() {
@@ -474,6 +619,12 @@
         setDomText('kpi-called-val', kpis.called.toLocaleString());
         setDomText('kpi-interested-val', kpis.interested.toLocaleString());
         setDomText('kpi-conv-val', kpis.convRate + '%');
+
+        // Real trends: created/called-time deltas; 0% flat when no baseline exists
+        window._renderTrend('kpi-total-trend', kpis.trends.total);
+        window._renderTrend('kpi-called-trend', kpis.trends.called);
+        window._renderTrend('kpi-interested-trend', kpis.trends.interested);
+        window._renderTrend('kpi-conv-trend', kpis.trends.conversion);
 
         setDomText('kpi-whatsapp-val', kpis.whatsapp.toLocaleString());
         setDomText('kpi-sitevisit-val', kpis.siteVisit.toLocaleString());
@@ -490,23 +641,58 @@
         if (el) el.textContent = val;
     }
 
+    // Render a KPI trend chip: ▲ 12% / ▼ 3% / — (no baseline / flat).
+    window._renderTrend = function(id, deltaPct) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const icon = el.querySelector('.material-symbols-outlined');
+        if (deltaPct === null || deltaPct === undefined || !Number.isFinite(deltaPct)) {
+            el.className = 'text-body-sm font-body-sm text-on-surface-variant flex items-center';
+            if (icon) icon.textContent = 'trending_flat';
+            el.textContent = ''; // clear text; icon kept
+            el.appendChild(icon);
+            el.insertAdjacentText('beforeend', ' —');
+            return;
+        }
+        if (deltaPct > 0) {
+            el.className = 'text-body-sm font-body-sm text-tertiary flex items-center';
+            if (icon) icon.textContent = 'arrow_upward';
+        } else if (deltaPct < 0) {
+            el.className = 'text-body-sm font-body-sm text-error flex items-center';
+            if (icon) icon.textContent = 'arrow_downward';
+        } else {
+            el.className = 'text-body-sm font-body-sm text-on-surface-variant flex items-center';
+            if (icon) icon.textContent = 'trending_flat';
+        }
+        el.textContent = '';
+        el.appendChild(icon);
+        el.insertAdjacentText('beforeend', ` ${Math.abs(deltaPct)}%`);
+    };
+
     // --- Update Dashboard Interactive Charts ---
     window.updateDashboardCharts = function() {
-        const sandboxLeads = window.appState.allLeads.filter(l => l.sandbox === window.appState.currentSandbox);
+        // currentSandbox 0 = aggregate across ALL sandboxes; 1-4 = one sandbox.
+        const activeSb = window.appState.currentSandbox;
+        const sandboxLeads = activeSb
+            ? window.appState.allLeads.filter(l => l.sandbox === activeSb)
+            : window.appState.allLeads;
         const called = sandboxLeads.filter(isCalled);
 
-        // 1. Engagement Timeline (Area Chart)
-        // Group calls and interested leads by day of the week (last 7 days)
-        const days = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        const callCounts = [0, 0, 0, 0, 0, 0, 0];
-        const interestedCounts = [0, 0, 0, 0, 0, 0, 0];
+        // 1. Engagement Timeline (ApexCharts area, rolling last 7 days)
+        const labels = window._chartDayLabels ? window._chartDayLabels() : [];
+        const callCounts = Array(7).fill(0);
+        const interestedCounts = Array(7).fill(0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         called.forEach(l => {
             if (l.called_at_iso) {
                 const date = new Date(l.called_at_iso);
-                const day = date.toLocaleDateString([], { weekday: 'short' });
-                const idx = days.indexOf(day);
-                if (idx !== -1) {
+                const dayStart = new Date(date);
+                dayStart.setHours(0, 0, 0, 0);
+                const diffDays = Math.round((today - dayStart) / 86400000);
+                const idx = 6 - diffDays;
+                if (idx >= 0 && idx < 7) {
                     callCounts[idx]++;
                     if (l.disposition === 'Interested') {
                         interestedCounts[idx]++;
@@ -515,131 +701,47 @@
             }
         });
 
-        // Regenerate Area paths for SVG
-        // SVG size: 800 x 250
-        // Mapping counts to height (max height 200, representing e.g. 15 calls)
-        const maxVal = Math.max(...callCounts, 5); // Avoid division by zero, scale relative to 5 min
-        
-        let pathCalls = "M0,230";
-        let pathCallsFill = "M0,230";
-        let pathInt = "M0,230";
-        let pathIntFill = "M0,230";
+        window.chartCurrentData = { days: labels, calls: callCounts, interested: interestedCounts };
 
-        const points = 7;
-        const xStep = 800 / (points - 1);
-
-        for (let i = 0; i < points; i++) {
-            const x = i * xStep;
-            // High y means low visual coordinate
-            const yCall = 230 - (callCounts[i] / maxVal) * 180;
-            const yInt = 230 - (interestedCounts[i] / maxVal) * 180;
-
-            pathCalls += ` L${x},${yCall}`;
-            pathCallsFill += ` L${x},${yCall}`;
-            pathInt += ` L${x},${yInt}`;
-            pathIntFill += ` L${x},${yInt}`;
-
-            // Update markers for peak or Tuesday/Wed
-            if (i === 3) { // Wed (representing mid-week)
-                const cMarker = document.getElementById('chart-marker-calls');
-                const iMarker = document.getElementById('chart-marker-int');
-                if (cMarker) { cMarker.setAttribute('cx', x); cMarker.setAttribute('cy', yCall); }
-                if (iMarker) { iMarker.setAttribute('cx', x); iMarker.setAttribute('cy', yInt); }
-            }
+        if (window.engagementChart) {
+            window.engagementChart.updateOptions({ xaxis: { categories: labels } });
+            window.engagementChart.updateSeries([
+                { name: 'Total Calls', data: callCounts },
+                { name: 'Interested', data: interestedCounts }
+            ]);
         }
 
-        // Store for hover access
-        window.chartCurrentData = {
-            days: days,
-            calls: callCounts,
-            interested: interestedCounts,
-            maxVal: maxVal
-        };
-
-        pathCallsFill += " L800,230 L800,250 L0,250 Z";
-        pathIntFill += " L800,230 L800,250 L0,250 Z";
-
-        const svgCallsFill = document.getElementById('svg-calls-fill');
-        const svgCallsLine = document.getElementById('svg-calls-line');
-        const svgIntFill = document.getElementById('svg-int-fill');
-        const svgIntLine = document.getElementById('svg-int-line');
-
-        if (svgCallsFill) svgCallsFill.setAttribute('d', pathCallsFill);
-        if (svgCallsLine) svgCallsLine.setAttribute('d', pathCalls);
-        if (svgIntFill) svgIntFill.setAttribute('d', pathIntFill);
-        if (svgIntLine) svgIntLine.setAttribute('d', pathInt);
-
-        // Update Y Axis labels based on maxVal
-        const yLabels = document.querySelectorAll('#chart-y-axis span');
-        if (yLabels.length === 5) {
-            yLabels[0].textContent = Math.round(maxVal).toString();
-            yLabels[1].textContent = Math.round(maxVal * 0.75).toString();
-            yLabels[2].textContent = Math.round(maxVal * 0.5).toString();
-            yLabels[3].textContent = Math.round(maxVal * 0.25).toString();
-            yLabels[4].textContent = '0';
-        }
-
-        // 2. Outcome Distribution (Donut Chart)
+        // 2. Outcome Distribution (ApexCharts donut)
         const interested = sandboxLeads.filter(l => l.disposition === 'Interested').length;
         const failed = sandboxLeads.filter(isFailed).length;
         const callbacks = sandboxLeads.filter(l => l.disposition === 'Call Later' || l.disposition === 'Callback').length;
         const answered = sandboxLeads.filter(l => l.disposition === 'Answered').length;
-        const totalOutcomes = interested + failed + callbacks + answered || 1;
+        const totalOutcomes = interested + failed + callbacks + answered;
+        window._donutTotal = totalOutcomes || 1;
+        window.donutCurrentData = { interested, failed, callbacks, answered, total: totalOutcomes };
 
-        // Store donut details on window for hover
-        window.donutCurrentData = {
-            interested: interested,
-            failed: failed,
-            callbacks: callbacks,
-            answered: answered,
-            total: interested + failed + callbacks + answered
-        };
+        if (window.outcomeChart) {
+            window.outcomeChart.updateSeries([interested, failed, callbacks, answered]);
+        }
 
-        // Donut segments (radius 40, circumference = 2 * PI * 40 = 251.2)
-        const pctInt = (interested / totalOutcomes) * 251.2;
-        const pctFail = (failed / totalOutcomes) * 251.2;
-        const pctCbk = (callbacks / totalOutcomes) * 251.2;
-        const pctAns = (answered / totalOutcomes) * 251.2;
-
-        const seg1 = document.getElementById('donut-seg-1');
-        const seg2 = document.getElementById('donut-seg-2');
-        const seg3 = document.getElementById('donut-seg-3');
-        const seg4 = document.getElementById('donut-seg-4');
-        const centerCount = document.getElementById('donut-center-count');
-
-        if (centerCount) centerCount.textContent = (interested + failed + callbacks + answered).toLocaleString();
-
-        if (seg1) { seg1.setAttribute('stroke-dasharray', `${pctInt} 251.2`); }
-        if (seg2) { seg2.setAttribute('stroke-dasharray', `${pctFail} 251.2`); seg2.setAttribute('stroke-dashoffset', `-${pctInt}`); }
-        if (seg3) { seg3.setAttribute('stroke-dasharray', `${pctCbk} 251.2`); seg3.setAttribute('stroke-dashoffset', `-${pctInt + pctFail}`); }
-        if (seg4) { seg4.setAttribute('stroke-dasharray', `${pctAns} 251.2`); seg4.setAttribute('stroke-dashoffset', `-${pctInt + pctFail + pctCbk}`); }
-
-        // 3. Hourly Distribution (Bar Chart)
-        // Group calls into intervals
-        const hours = Array(12).fill(0); // 12 intervals of 2 hours
+        // 3. Hourly Distribution (ApexCharts 24 bars, full day)
+        const hours = Array(24).fill(0);
         called.forEach(l => {
             if (l.called_at_iso) {
                 const hour = new Date(l.called_at_iso).getHours();
-                const idx = Math.floor(hour / 2);
-                if (idx >= 0 && idx < 12) {
-                    hours[idx]++;
+                if (hour >= 0 && hour < 24) {
+                    hours[hour]++;
                 }
             }
         });
+        window.barCurrentData = { hours };
 
-        // Store hourly details on window for hover
-        window.barCurrentData = {
-            hours: hours
-        };
-
-        const maxHr = Math.max(...hours, 1);
-        const bars = document.querySelectorAll('.chart-bar');
-        bars.forEach((bar, idx) => {
-            if (idx < 12) {
-                const pct = (hours[idx] / maxHr) * 95;
-                bar.style.height = `${pct}%`;
-            }
-        });
+        if (window.hourlyChart) {
+            window.hourlyChart.updateOptions({
+                xaxis: { categories: window._hourlyLabels ? window._hourlyLabels() : [] }
+            });
+            window.hourlyChart.updateSeries([{ name: 'Calls', data: hours }]);
+        }
     };
 
     // --- Date Filter Helper ---
@@ -653,7 +755,11 @@
 
     // --- Hourly Distribution Filter ---
     window.filterHourlyDistribution = function(filterType) {
-        const sandboxLeads = window.appState.allLeads.filter(l => l.sandbox === window.appState.currentSandbox);
+        // currentSandbox 0 = aggregate across ALL sandboxes; 1-4 = one sandbox.
+        const activeSb = window.appState.currentSandbox;
+        const sandboxLeads = activeSb
+            ? window.appState.allLeads.filter(l => l.sandbox === activeSb)
+            : window.appState.allLeads;
         let called = sandboxLeads.filter(isCalled);
 
         // Apply disposition filter on top of time filter
@@ -705,26 +811,23 @@
             }
         });
 
-        // Regenerate the hourly chart with filtered data
-        const hours = Array(12).fill(0);
+        // Regenerate the hourly chart with filtered data (24 bars)
+        const hours = Array(24).fill(0);
         filteredCalled.forEach(l => {
             if (l.called_at_iso) {
                 const hour = new Date(l.called_at_iso).getHours();
-                const idx = Math.floor(hour / 2);
-                if (idx >= 0 && idx < 12) {
-                    hours[idx]++;
+                if (hour >= 0 && hour < 24) {
+                    hours[hour]++;
                 }
             }
         });
 
-        const maxHr = Math.max(...hours, 1);
-        const bars = document.querySelectorAll('.chart-bar');
-        bars.forEach((bar, idx) => {
-            if (idx < 12) {
-                const pct = (hours[idx] / maxHr) * 95;
-                bar.style.height = `${pct}%`;
-            }
-        });
+        if (window.hourlyChart) {
+            window.hourlyChart.updateOptions({
+                xaxis: { categories: window._hourlyLabels ? window._hourlyLabels() : [] }
+            });
+            window.hourlyChart.updateSeries([{ name: 'Calls', data: hours }]);
+        }
 
         // Update title with disposition context if active
         const titleEl = document.querySelector('#hourly-distribution h2');
@@ -807,7 +910,11 @@
 
     // --- Update charts to reflect active disposition filter ---
     window.renderFilteredCharts = function() {
-        const sandboxLeads = window.appState.allLeads.filter(l => l.sandbox === window.appState.currentSandbox);
+        // currentSandbox 0 = aggregate across ALL sandboxes; 1-4 = one sandbox.
+        const activeSb = window.appState.currentSandbox;
+        const sandboxLeads = activeSb
+            ? window.appState.allLeads.filter(l => l.sandbox === activeSb)
+            : window.appState.allLeads;
         let filtered = sandboxLeads;
         const f = window.appState.currentFilter;
 
@@ -839,16 +946,21 @@
 
     // --- Engagement Timeline (Area Chart) — filtered data ---
     window._renderEngagementTimeline = function(filteredCalled) {
-        const days = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        const callCounts = [0, 0, 0, 0, 0, 0, 0];
-        const interestedCounts = [0, 0, 0, 0, 0, 0, 0];
+        // Rolling last-7-days buckets (matches updateDashboardCharts)
+        const labels = window._chartDayLabels ? window._chartDayLabels() : [];
+        const callCounts = Array(7).fill(0);
+        const interestedCounts = Array(7).fill(0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         filteredCalled.forEach(l => {
             if (l.called_at_iso) {
                 const date = new Date(l.called_at_iso);
-                const day = date.toLocaleDateString([], { weekday: 'short' });
-                const idx = days.indexOf(day);
-                if (idx !== -1) {
+                const dayStart = new Date(date);
+                dayStart.setHours(0, 0, 0, 0);
+                const diffDays = Math.round((today - dayStart) / 86400000);
+                const idx = 6 - diffDays;
+                if (idx >= 0 && idx < 7) {
                     callCounts[idx]++;
                     if (l.disposition === 'Interested') {
                         interestedCounts[idx]++;
@@ -857,58 +969,21 @@
             }
         });
 
-        const maxVal = Math.max(...callCounts, 5);
-        let pathCalls = "M0,230";
-        let pathCallsFill = "M0,230";
-        let pathInt = "M0,230";
-        let pathIntFill = "M0,230";
-        const points = 7;
-        const xStep = 800 / (points - 1);
+        window.chartCurrentData = { days: labels, calls: callCounts, interested: interestedCounts };
 
-        for (let i = 0; i < points; i++) {
-            const x = i * xStep;
-            const yCall = 230 - (callCounts[i] / maxVal) * 180;
-            const yInt = 230 - (interestedCounts[i] / maxVal) * 180;
-            pathCalls += ` L${x},${yCall}`;
-            pathCallsFill += ` L${x},${yCall}`;
-            pathInt += ` L${x},${yInt}`;
-            pathIntFill += ` L${x},${yInt}`;
-            if (i === 3) {
-                const cMarker = document.getElementById('chart-marker-calls');
-                const iMarker = document.getElementById('chart-marker-int');
-                if (cMarker) { cMarker.setAttribute('cx', x); cMarker.setAttribute('cy', yCall); }
-                if (iMarker) { iMarker.setAttribute('cx', x); iMarker.setAttribute('cy', yInt); }
-            }
-        }
-
-        window.chartCurrentData = { days, calls: callCounts, interested: interestedCounts, maxVal };
-
-        pathCallsFill += " L800,230 L800,250 L0,250 Z";
-        pathIntFill += " L800,230 L800,250 L0,250 Z";
-
-        const svgCallsFill = document.getElementById('svg-calls-fill');
-        const svgCallsLine = document.getElementById('svg-calls-line');
-        const svgIntFill = document.getElementById('svg-int-fill');
-        const svgIntLine = document.getElementById('svg-int-line');
-        if (svgCallsFill) svgCallsFill.setAttribute('d', pathCallsFill);
-        if (svgCallsLine) svgCallsLine.setAttribute('d', pathCalls);
-        if (svgIntFill) svgIntFill.setAttribute('d', pathIntFill);
-        if (svgIntLine) svgIntLine.setAttribute('d', pathInt);
-
-        // When Interested is selected, do not draw a duplicate "total calls"
-        // series over the interested series. This makes the chart truthful and
-        // visually unambiguous for small result sets (for example, 3 leads).
+        // When Interested is selected, only show the interested series so the
+        // chart stays truthful and unambiguous for small result sets.
         const interestedOnly = window.appState.currentFilter === 'Interested';
-        if (svgCallsFill) svgCallsFill.style.display = interestedOnly ? 'none' : '';
-        if (svgCallsLine) svgCallsLine.style.display = interestedOnly ? 'none' : '';
-
-        const yLabels = document.querySelectorAll('#chart-y-axis span');
-        if (yLabels.length === 5) {
-            yLabels[0].textContent = Math.round(maxVal).toString();
-            yLabels[1].textContent = Math.round(maxVal * 0.75).toString();
-            yLabels[2].textContent = Math.round(maxVal * 0.5).toString();
-            yLabels[3].textContent = Math.round(maxVal * 0.25).toString();
-            yLabels[4].textContent = '0';
+        if (window.engagementChart) {
+            window.engagementChart.updateOptions({ xaxis: { categories: labels } });
+            window.engagementChart.updateSeries(
+                interestedOnly
+                    ? [{ name: 'Interested', data: interestedCounts }]
+                    : [
+                        { name: 'Total Calls', data: callCounts },
+                        { name: 'Interested', data: interestedCounts }
+                    ]
+            );
         }
 
         // Update hourly distribution title to show active filter
@@ -922,23 +997,20 @@
 
     // --- Hourly Distribution (Bar Chart) — filtered data ---
     window._renderHourlyDistribution = function(filteredCalled) {
-        const hours = Array(12).fill(0);
+        const hours = Array(24).fill(0);
         filteredCalled.forEach(l => {
             if (l.called_at_iso) {
                 const hour = new Date(l.called_at_iso).getHours();
-                const idx = Math.floor(hour / 2);
-                if (idx >= 0 && idx < 12) hours[idx]++;
+                if (hour >= 0 && hour < 24) hours[hour]++;
             }
         });
         window.barCurrentData = { hours };
-        const maxHr = Math.max(...hours, 1);
-        const bars = document.querySelectorAll('.chart-bar');
-        bars.forEach((bar, idx) => {
-            if (idx < 12) {
-                const pct = (hours[idx] / maxHr) * 95;
-                bar.style.height = `${pct}%`;
-            }
-        });
+        if (window.hourlyChart) {
+            window.hourlyChart.updateOptions({
+                xaxis: { categories: window._hourlyLabels ? window._hourlyLabels() : [] }
+            });
+            window.hourlyChart.updateSeries([{ name: 'Calls', data: hours }]);
+        }
     };
 
     // --- Render bottom Call Logs Table ---
@@ -946,10 +1018,19 @@
         const tbody = document.getElementById('call-logs-tbody');
         if (!tbody) return;
 
-        const sandboxLeads = window.appState.allLeads.filter(l => l.sandbox === window.appState.currentSandbox);
+        // currentSandbox 0 = aggregate across ALL sandboxes; 1-4 = one sandbox.
+        const activeSb = window.appState.currentSandbox;
+        const sandboxLeads = activeSb
+            ? window.appState.allLeads.filter(l => l.sandbox === activeSb)
+            : window.appState.allLeads;
         
         // Filter logic
         let filtered = sandboxLeads;
+
+        // Upload-source / broker filter (dropdown 'Source')
+        if (window.appState.currentSource && window.appState.currentSource !== 'all') {
+            filtered = filtered.filter(l => window.leadSourceKey(l) === window.appState.currentSource);
+        }
 
         if (window.appState.currentFilter === 'Interested') {
             filtered = filtered.filter(l => l.disposition === 'Interested');
@@ -1005,7 +1086,7 @@
 
         // Render Table Body
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-on-surface-variant font-medium">No matching call logs found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-on-surface-variant font-medium">No matching call logs found.</td></tr>`;
             return;
         }
 
@@ -1057,6 +1138,7 @@
                     ${lead.status === 'inbound' ? `<span class="px-1.5 py-0.5 bg-secondary text-on-secondary rounded text-[9px] font-bold uppercase">Inbound</span>` : ''}
                 </td>
                 <td class="p-4 text-on-surface-variant">${lead.phone}</td>
+                <td class="p-4 text-on-surface-variant text-xs">${window.leadSourceOf(lead)}</td>
                 <td class="p-4 text-on-surface-variant">${dateStr}</td>
                 <td class="p-4 text-on-surface-variant max-w-[320px] truncate" title="${lead.summary}">${lead.summary}</td>
                 <td class="p-4">${ratingHtml}</td>
@@ -1115,11 +1197,10 @@
         document.getElementById('qa-summary').textContent = lead.summary;
 
         const recContainer = document.getElementById('transcript-rec-player');
-        if (lead.duration_sec > 0) {
+        const recSrc = lead.recording_url || lead.recording_path || '';
+        if (recSrc) {
             recContainer.style.display = 'block';
-            document.getElementById('transcript-audio-player').src = leadId % 2 === 0
-                ? "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-                : "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3";
+            document.getElementById('transcript-audio-player').src = recSrc;
         } else {
             recContainer.style.display = 'none';
         }
@@ -1134,9 +1215,9 @@
         } else if (Array.isArray(lead.transcript) && lead.transcript.length > 0) {
             let html = '';
             lead.transcript.forEach(t => {
-                const isAgent = t.role === 'agent';
+                const isAgent = t.role === 'agent' || t.speaker === 'agent';
                 const bubbleClass = isAgent ? 'chat-bubble-agent' : 'chat-bubble-user';
-                const sender = isAgent ? 'AI Assistant' : lead.name;
+                const sender = isAgent ? 'Vernika' : (lead.name || 'User');
                 const alignmentClass = isAgent ? 'items-start' : 'items-end';
                 
                 html += `
@@ -1162,6 +1243,7 @@
         document.getElementById('view-dashboard').style.display = 'none';
         document.getElementById('view-campaigns').style.display = 'none';
         document.getElementById('view-make-a-call').style.display = 'none';
+        document.getElementById('view-vobiz').style.display = 'none';
         document.getElementById('view-config').style.display = 'none';
 
         // Show active view
@@ -1196,6 +1278,8 @@
             window.loadCampaignControl();
         } else if (viewId === 'make-a-call') {
             window.loadRecentManualCalls();
+        } else if (viewId === 'vobiz') {
+            window.loadVobizConfig();
         } else if (viewId === 'config') {
             window.loadConfigSettings();
         }
@@ -2249,11 +2333,15 @@
             set('config-prompt', d.prompt);
             set('config-rag', d.rag);
             set('config-greeting', d.greeting_text);
+            set('config-language', d.language || 'te-IN');
+            const mirrorEl = document.getElementById('config-multilingual-mirror');
+            if (mirrorEl) mirrorEl.checked = !(d.multilingual_mirror === false);
         } catch (e) {
             window.showToast && window.showToast('Failed to load config: ' + (e.message || e), 'error');
         }
         // Load campaign cases
         window.loadCases();
+        window.refreshGreetingAudio();
     };
 
     window.saveConfigSettings = async function() {
@@ -2262,6 +2350,8 @@
             prompt: (document.getElementById('config-prompt')?.value || '').trim(),
             rag: (document.getElementById('config-rag')?.value || '').trim(),
             greeting_text: (document.getElementById('config-greeting')?.value || '').trim(),
+            language: (document.getElementById('config-language')?.value || '').trim(),
+            multilingual_mirror: !!(document.getElementById('config-multilingual-mirror')?.checked),
         };
         try {
             const res = await fetch(window.apiBase + `/api/tuning?role=${role}`, {
@@ -2275,6 +2365,211 @@
         } catch (e) {
             window.showToast('Save failed: ' + (e.message || e), 'error');
         }
+    };
+
+    // ── Voice & Language: pre-recorded greeting audio status + record ──
+    window.refreshGreetingAudio = async function() {
+        const role = encodeURIComponent(window.dashRoleForApi());
+        try {
+            const res = await fetch(window.apiBase + `/api/greeting/status?role=${role}`, { cache: 'no-store' });
+            const labelEl = document.getElementById('greeting-audio-label');
+            const metaEl = document.getElementById('greeting-audio-meta');
+            const pill = document.getElementById('voice-status-pill');
+            if (!res.ok) throw new Error(res.statusText);
+            const d = await res.json();
+            if (d.ready) {
+                if (labelEl) labelEl.textContent = 'Pre-recorded greeting ready';
+                if (metaEl) metaEl.textContent = `${(d.duration_sec || 0).toFixed(1)}s • ${d.source || 'recorded'} • ${d.voice || ''}`;
+                if (pill) { pill.textContent = 'Audio ready'; pill.className = 'text-[10px] font-extrabold uppercase tracking-widest bg-tertiary/15 text-tertiary px-2.5 py-1 rounded-full'; }
+            } else {
+                if (labelEl) labelEl.textContent = 'No greeting audio yet';
+                if (metaEl) metaEl.textContent = 'Click "Record Greeting" to generate (Gemini Live, call voice).';
+                if (pill) { pill.textContent = 'No audio'; pill.className = 'text-[10px] font-extrabold uppercase tracking-widest bg-error/10 text-error px-2.5 py-1 rounded-full'; }
+            }
+        } catch (e) {
+            const labelEl = document.getElementById('greeting-audio-label');
+            if (labelEl) labelEl.textContent = 'Status unavailable';
+        }
+    };
+
+    window.recordGreetingAudio = async function() {
+        const role = encodeURIComponent(window.dashRoleForApi());
+        const greeting = (document.getElementById('config-greeting')?.value || '').trim();
+        if (!greeting) {
+            window.showToast && window.showToast('Save a greeting text first (above), then record.', 'error');
+            return;
+        }
+        const btn = event && event.currentTarget;
+        if (btn) { btn.disabled = true; btn.textContent = 'Recording…'; }
+        try {
+            const res = await fetch(window.apiBase + `/api/tuning/record-greeting?role=${role}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ greeting_text: greeting }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Recording failed');
+            window.showToast && window.showToast('Greeting recorded with the call voice.', 'success');
+            await window.refreshGreetingAudio();
+        } catch (e) {
+            window.showToast && window.showToast('Record failed: ' + (e.message || e), 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Record Greeting'; }
+        }
+    };
+
+    // ── Vobiz Integration (plug-and-play auth + webhook + numbers) ──
+    window._vobizAccounts = [];
+    window._vobizExtraNumbers = [];
+
+    window.loadVobizConfig = async function() {
+        const role = encodeURIComponent(window.dashRoleForApi());
+        try {
+            const res = await fetch(window.apiBase + `/api/settings/vobiz?role=${role}`, { cache: 'no-store' });
+            if (!res.ok) throw new Error(res.statusText);
+            const d = await res.json();
+
+            window._vobizAccounts = (d.accounts && d.accounts.length)
+                ? d.accounts
+                : [{ name: 'Default', auth_id: '', auth_token: '' }];
+            window._renderVobizAccounts();
+
+            const webhookEl = document.getElementById('vobiz-webhook');
+            if (webhookEl) webhookEl.textContent = d.webhook_url || '(not configured — set public URL)';
+
+            const inboundEl = document.getElementById('vobiz-inbound-webhook');
+            if (inboundEl) inboundEl.textContent = d.inbound_webhook_url || '(not configured)';
+
+            const envNote = document.getElementById('vobiz-env-note');
+            if (envNote) envNote.classList.toggle('hidden', !d.has_env_override);
+
+            // Numbers
+            for (let i = 1; i <= 9; i++) {
+                const el = document.getElementById('vobiz-p' + i);
+                if (el) el.value = d['p' + i + '_number'] || '';
+            }
+
+            // Extra numbers
+            window._vobizExtraNumbers = (d.phone_numbers && d.phone_numbers.length)
+                ? d.phone_numbers.slice()
+                : [''];
+            window._renderVobizNumbers();
+        } catch (e) {
+            window.showToast && window.showToast('Failed to load Vobiz config: ' + (e.message || e), 'error');
+        }
+    };
+
+    window._renderVobizNumbers = function() {
+        const container = document.getElementById('vobiz-extra-numbers');
+        if (!container) return;
+        container.innerHTML = window._vobizExtraNumbers.map((num, idx) => `
+            <div class="flex items-center gap-2">
+                <input class="flex-1 px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none" placeholder="+91..." value="${(num || '').replace(/"/g, '&quot;')}" data-vobiz-extra="${idx}">
+                <button class="text-on-surface-variant hover:text-error transition-colors" onclick="window.removeVobizNumber(${idx})"><span class="material-symbols-outlined text-sm">delete</span></button>
+            </div>
+        `).join('');
+    };
+
+    window.addVobizNumber = function() {
+        window._vobizExtraNumbers.push('');
+        window._renderVobizNumbers();
+    };
+
+    window.removeVobizNumber = function(idx) {
+        window._vobizExtraNumbers.splice(idx, 1);
+        if (!window._vobizExtraNumbers.length) window._vobizExtraNumbers.push('');
+        window._renderVobizNumbers();
+    };
+
+    window._renderVobizAccounts = function() {
+        const container = document.getElementById('vobiz-accounts');
+        if (!container) return;
+        container.innerHTML = window._vobizAccounts.map((acc, idx) => `
+            <div class="flex flex-col gap-2 p-3 bg-surface-container-low rounded-lg border ${idx === 0 ? 'border-primary/40' : 'border-surface-container'}">
+                <div class="flex items-center gap-2">
+                    <input class="flex-1 px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Account name (e.g. Vobiz Trunk 1)" value="${(acc.name || '').replace(/"/g, '&quot;')}" data-vobiz-name="${idx}">
+                    ${idx === 0 ? '<span class="text-[9px] font-bold uppercase tracking-widest text-primary px-2 py-0.5 bg-primary-fixed/20 rounded-full">Active</span>' : ''}
+                    ${idx > 0 ? '<button class="text-on-surface-variant hover:text-primary transition-colors" onclick="window.removeVobizAccount(' + idx + ')"><span class="material-symbols-outlined text-sm">delete</span></button>' : ''}
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Auth ID" value="${(acc.auth_id || '').replace(/"/g, '&quot;')}" data-vobiz-authid="${idx}">
+                    <input type="password" class="px-2 py-1.5 bg-surface-container-lowest border border-surface-container rounded-md text-body-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Auth Token" value="${(acc.auth_token || '').replace(/"/g, '&quot;')}" data-vobiz-token="${idx}">
+                </div>
+            </div>
+        `).join('');
+    };
+
+    window.addVobizAccount = function() {
+        window._vobizAccounts.push({ name: '', auth_id: '', auth_token: '' });
+        window._renderVobizAccounts();
+    };
+
+    window.removeVobizAccount = function(idx) {
+        if (idx <= 0) return; // keep at least one
+        window._vobizAccounts.splice(idx, 1);
+        window._renderVobizAccounts();
+    };
+
+    window.saveVobizConfig = async function() {
+        const role = encodeURIComponent(window.dashRoleForApi());
+
+        // Collect accounts from the rendered inputs
+        const container = document.getElementById('vobiz-accounts');
+        if (container) {
+            container.querySelectorAll('[data-vobiz-authid]').forEach(inp => {
+                const idx = parseInt(inp.dataset.vobizAuthid, 10);
+                if (!window._vobizAccounts[idx]) return;
+                window._vobizAccounts[idx].auth_id = inp.value.trim();
+                window._vobizAccounts[idx].auth_token = (container.querySelector(`[data-vobiz-token="${idx}"]`)?.value || '').trim();
+                window._vobizAccounts[idx].name = (container.querySelector(`[data-vobiz-name="${idx}"]`)?.value || '').trim();
+            });
+        }
+
+        // Collect extra numbers from the rendered inputs
+        const extraContainer = document.getElementById('vobiz-extra-numbers');
+        if (extraContainer) {
+            extraContainer.querySelectorAll('[data-vobiz-extra]').forEach(inp => {
+                const idx = parseInt(inp.dataset.vobizExtra, 10);
+                window._vobizExtraNumbers[idx] = inp.value.trim();
+            });
+        }
+        const extraNumbers = window._vobizExtraNumbers.filter(n => n);
+
+        // 1) Save auth accounts + webhook + extra numbers
+        const accountsPayload = window._vobizAccounts.filter(a => a.auth_id || a.auth_token || a.name);
+        try {
+            const res = await fetch(window.apiBase + `/api/settings/vobiz?role=${role}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accounts: accountsPayload.length ? accountsPayload : undefined,
+                    phone_numbers: extraNumbers,
+                }),
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+        } catch (e) {
+            window.showToast('Vobiz auth save failed: ' + (e.message || e), 'error');
+            return;
+        }
+
+        // 2) Save P1-P9 numbers via the tuning API (feeds the call allocator)
+        const numBody = {};
+        for (let i = 1; i <= 9; i++) {
+            numBody['p' + i + '_number'] = (document.getElementById('vobiz-p' + i)?.value || '').trim();
+        }
+        try {
+            const res = await fetch(window.apiBase + `/api/tuning?role=${role}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(numBody),
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+        } catch (e) {
+            window.showToast('Phone numbers save failed: ' + (e.message || e), 'error');
+            return;
+        }
+
+        window.showToast('Vobiz settings saved — live on the next call.', 'success');
     };
 
     // ── Campaign Cases ──
@@ -2459,6 +2754,17 @@
          window.pollCampaignStatus();
          setInterval(() => { window.pollCampaignStatus(); }, 5000);
 
+         // Auto-refresh real leads every 3s so status transitions
+         // (pending -> dialing -> completed/failed) appear live without a
+         // manual reload. Cheap: dashboard/leads is a direct DB read.
+         setInterval(() => {
+             const dot = document.getElementById('campaign-status-dot');
+             const active = dot && (dot.className || '').includes('pulse-active');
+             if (active) {
+                 window.loadRealLeads().then(() => window.updateDashboardUI());
+             }
+         }, 3000);
+
         // 1. Sidebar views navigation
         const links = document.querySelectorAll('.nav-link');
         links.forEach(link => {
@@ -2518,6 +2824,13 @@
          if (selectLoc) selectLoc.addEventListener('change', window.renderCallLogsTable);
          if (selectBud) selectBud.addEventListener('change', window.renderCallLogsTable);
 
+         // 6a. Upload-source / broker filter (Source dropdown)
+         const selectSrc = document.getElementById('filter-source');
+         if (selectSrc) {
+             selectSrc.addEventListener('change', (e) => window.filterBySource(e.target.value));
+             window.populateSourceFilter();
+         }
+
          // 6b. Date range filter
          const dateFrom = document.getElementById('filter-date-from');
          const dateTo = document.getElementById('filter-date-to');
@@ -2533,6 +2846,11 @@
                 localStorage.setItem('theme', isDark ? 'dark' : 'light');
                 themeBtn.querySelector('.material-symbols-outlined').textContent = isDark ? 'light_mode' : 'dark_mode';
                 themeBtn.querySelector('span:not(.material-symbols-outlined)').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+                // Keep ApexCharts in sync with the theme
+                const t = isDark ? 'dark' : 'light';
+                if (window.engagementChart) window.engagementChart.updateOptions({ theme: { mode: t, palette: 'palette1' } });
+                if (window.outcomeChart) window.outcomeChart.updateOptions({ theme: { mode: t, palette: 'palette1' } });
+                if (window.hourlyChart) window.hourlyChart.updateOptions({ theme: { mode: t, palette: 'palette1' } });
                 window.showToast(isDark ? 'Dark mode enabled' : 'Light mode enabled', 'info');
             });
 
@@ -2544,227 +2862,168 @@
             }
         }
 
-        // 8. Engagement Timeline hover tooltip interactions
-        const overlay = document.getElementById('chart-hover-overlay');
-        const tooltipCard = document.getElementById('chart-tooltip-card');
-        const tooltipLine = document.getElementById('chart-tooltip-line');
-        const dotCalls = document.getElementById('chart-tooltip-dot-calls');
-        const dotInt = document.getElementById('chart-tooltip-dot-int');
+        // 8-10. ApexCharts: Engagement Timeline, Outcome Distribution, Hourly Distribution
+        window.initApexCharts = function() {
+            if (typeof ApexCharts === 'undefined') return;
 
-        if (overlay && tooltipCard) {
-            overlay.addEventListener('mousemove', (e) => {
-                const data = window.chartCurrentData;
-                if (!data) return;
+            const isDark = document.documentElement.classList.contains('dark');
+            const chartTheme = isDark ? 'dark' : 'light';
 
-                // Get relative X position
-                const rect = overlay.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const relativeX = mouseX / rect.width; // 0 to 1
-                
-                // Map to closest point (0 to 6)
-                const points = 7;
-                let idx = Math.round(relativeX * (points - 1));
-                if (idx < 0) idx = 0;
-                if (idx >= points) idx = points - 1;
+            // ---- Engagement Timeline (area, last 7 rolling days) ----
+            if (!window.engagementChart && document.getElementById('engagement-chart')) {
+                window.engagementChart = new ApexCharts(document.getElementById('engagement-chart'), {
+                    theme: { mode: chartTheme, palette: 'palette1' },
+                    series: [
+                        { name: 'Total Calls', data: [0, 0, 0, 0, 0, 0, 0] },
+                        { name: 'Interested', data: [0, 0, 0, 0, 0, 0, 0] }
+                    ],
+                    chart: { type: 'area', height: 310, fontFamily: 'inherit', toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent' },
+                    colors: ['#bd0917', '#00857f'],
+                    dataLabels: { enabled: false },
+                    stroke: { curve: 'smooth', width: 2.5 },
+                    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.28, opacityTo: 0.03, stops: [0, 95] } },
+                    legend: { show: true, position: 'top', horizontalAlign: 'right', fontSize: '12px', markers: { size: 5 } },
+                    xaxis: { categories: window._chartDayLabels ? window._chartDayLabels() : [], labels: { style: { fontSize: '11px' } } },
+                    yaxis: { labels: { formatter: v => Math.round(v), style: { fontSize: '11px' } }, min: 0, forceNiceScale: true },
+                    tooltip: { shared: true, intersect: false, y: { formatter: v => `${Math.round(v || 0)} calls` } },
+                    grid: { borderColor: '#e1e3e4', strokeDashArray: 4 }
+                });
+                window.engagementChart.render();
+            }
 
-                // Calculate visual coordinates
-                const xStep = 800 / (points - 1);
-                const visualX = idx * xStep;
-                const yCall = 230 - (data.calls[idx] / data.maxVal) * 180;
-                const yInt = 230 - (data.interested[idx] / data.maxVal) * 180;
+            // ---- Outcome Distribution (donut with click-to-filter) ----
+            if (!window.outcomeChart && document.getElementById('outcome-chart')) {
+                window.outcomeChart = new ApexCharts(document.getElementById('outcome-chart'), {
+                    theme: { mode: chartTheme, palette: 'palette1' },
+                    series: [0, 0, 0, 0],
+                    chart: { type: 'donut', height: 260, fontFamily: 'inherit', background: 'transparent' },
+                    labels: ['Interested', 'Failed', 'Call Later', 'Answered'],
+                    colors: ['#bd0917', '#e5bdb9', '#5cb1ff', '#00857f'],
+                    legend: { show: false },
+                    dataLabels: { enabled: false },
+                    plotOptions: { pie: { donut: { size: '72%', labels: { show: true, name: { show: true, fontSize: '13px' }, value: { show: true, fontSize: '20px', fontWeight: 700 }, total: { show: true, label: 'Total', fontSize: '12px' } } } } },
+                    tooltip: { y: { formatter: v => `${v} (${Math.round(v * 100 / (window._donutTotal || 1))}%)` } },
+                    responsive: [{ breakpoint: 480, options: { chart: { height: 220 } } }]
+                });
+                window.outcomeChart.render();
+            }
 
-                // Update tooltip line
-                if (tooltipLine) {
-                    tooltipLine.setAttribute('x1', visualX);
-                    tooltipLine.setAttribute('x2', visualX);
-                    tooltipLine.style.display = 'block';
-                }
-
-                // Update dots
-                if (dotCalls) {
-                    dotCalls.setAttribute('cx', visualX);
-                    dotCalls.setAttribute('cy', yCall);
-                    dotCalls.style.display = 'block';
-                }
-                if (dotInt) {
-                    dotInt.setAttribute('cx', visualX);
-                    dotInt.setAttribute('cy', yInt);
-                    dotInt.style.display = 'block';
-                }
-
-                // Update Card content
-                const dateEl = document.getElementById('chart-tooltip-date');
-                const valCalls = document.getElementById('chart-tooltip-val-calls');
-                const valInt = document.getElementById('chart-tooltip-val-int');
-
-                if (dateEl) dateEl.textContent = `Day: ${data.days[idx]}`;
-                if (valCalls) valCalls.textContent = data.calls[idx];
-                if (valInt) valInt.textContent = data.interested[idx];
-
-                // Position the Card (offset by some pixels)
-                // Map visualX (0-800) back to client pixels relative to container
-                const cardWidth = tooltipCard.offsetWidth || 140;
-                const containerWidth = rect.width;
-                let clientX = (visualX / 800) * containerWidth;
-                
-                // Keep tooltip within bounds
-                if (clientX + cardWidth + 15 > containerWidth) {
-                    clientX = clientX - cardWidth - 15;
-                } else {
-                    clientX = clientX + 15;
-                }
-
-                tooltipCard.style.left = `${clientX}px`;
-                tooltipCard.style.top = '30px';
-                tooltipCard.style.display = 'block';
-            });
-
-            overlay.addEventListener('mouseleave', () => {
-                if (tooltipLine) tooltipLine.style.display = 'none';
-                if (dotCalls) dotCalls.style.display = 'none';
-                if (dotInt) dotInt.style.display = 'none';
-                tooltipCard.style.display = 'none';
-            });
-        }
-
-        // 9. Donut Chart hover segment interactions
-        const donutTooltipCard = document.getElementById('donut-tooltip-card');
-        const donutTooltipTitle = document.getElementById('donut-tooltip-title');
-        const donutTooltipColor = document.getElementById('donut-tooltip-color');
-        const donutTooltipVal = document.getElementById('donut-tooltip-val');
-        const donutCenterLabel = document.getElementById('donut-center-label');
-        const donutCenterCount = document.getElementById('donut-center-count');
-
-        const donutCategories = {
-            'donut-seg-1': { label: 'Interested', color: '#bd0917', key: 'interested' },
-            'donut-seg-2': { label: 'Failed', color: '#e5bdb9', key: 'failed' },
-            'donut-seg-3': { label: 'Call Later', color: '#5cb1ff', key: 'callbacks' },
-            'donut-seg-4': { label: 'Answered', color: '#00857f', key: 'answered' }
+            // ---- Hourly Distribution (24 bars with custom range) ----
+            if (!window.hourlyChart && document.getElementById('hourly-chart')) {
+                window.hourlyChart = new ApexCharts(document.getElementById('hourly-chart'), {
+                    theme: { mode: chartTheme, palette: 'palette1' },
+                    series: [{ name: 'Calls', data: Array(24).fill(0) }],
+                    chart: { type: 'bar', height: 240, fontFamily: 'inherit', toolbar: { show: false }, background: 'transparent' },
+                    colors: ['#bd0917'],
+                    plotOptions: { bar: { columnWidth: '55%', borderRadius: 2 } },
+                    dataLabels: { enabled: false },
+                    xaxis: { categories: window._hourlyLabels ? window._hourlyLabels() : [], labels: { rotate: -45, style: { fontSize: '10px' } } },
+                    yaxis: { labels: { formatter: v => Math.round(v), style: { fontSize: '11px' } }, min: 0, forceNiceScale: true },
+                    tooltip: { y: { formatter: v => `${Math.round(v || 0)} calls` } },
+                    grid: { borderColor: '#e1e3e4', strokeDashArray: 4 },
+                    states: { hover: { filter: { type: 'darken', value: 0.15 } } }
+                });
+                window.hourlyChart.render();
+            }
         };
 
-        Object.keys(donutCategories).forEach(segId => {
-            const segEl = document.getElementById(segId);
-            if (segEl) {
-                const cat = donutCategories[segId];
-                
-                segEl.addEventListener('mouseenter', (e) => {
-                    const data = window.donutCurrentData;
-                    if (!data) return;
-                    
-                    const value = data[cat.key];
-                    
-                    // Style seg element (expand stroke width to 18px)
-                    segEl.setAttribute('stroke-width', '18');
-                    
-                    // Update Donut Center Text
-                    if (donutCenterLabel) donutCenterLabel.textContent = cat.label;
-                    if (donutCenterCount) donutCenterCount.textContent = value.toLocaleString();
-                    
-                    // Update Tooltip Card
-                    if (donutTooltipCard) {
-                        if (donutTooltipTitle) donutTooltipTitle.textContent = cat.label;
-                        if (donutTooltipColor) donutTooltipColor.style.backgroundColor = cat.color;
-                        if (donutTooltipVal) donutTooltipVal.textContent = value;
-                        
-                        // Position relative to mouse client position within the chart relative box
-                        const parentRect = donutTooltipCard.parentElement.getBoundingClientRect();
-                        const cardX = e.clientX - parentRect.left + 15;
-                        const cardY = e.clientY - parentRect.top + 15;
-                        
-                        donutTooltipCard.style.left = `${cardX}px`;
-                        donutTooltipCard.style.top = `${cardY}px`;
-                        donutTooltipCard.style.display = 'block';
-                    }
-                });
-                
-                segEl.addEventListener('mousemove', (e) => {
-                    if (donutTooltipCard) {
-                        const parentRect = donutTooltipCard.parentElement.getBoundingClientRect();
-                        const cardX = e.clientX - parentRect.left + 15;
-                        const cardY = e.clientY - parentRect.top + 15;
-                        
-                        donutTooltipCard.style.left = `${cardX}px`;
-                        donutTooltipCard.style.top = `${cardY}px`;
-                    }
-                });
-
-                segEl.addEventListener('mouseleave', () => {
-                    segEl.setAttribute('stroke-width', '15');
-                    
-                    // Restore center text to sum of outcomes
-                    const data = window.donutCurrentData;
-                    if (data) {
-                        if (donutCenterLabel) donutCenterLabel.textContent = 'Total';
-                        if (donutCenterCount) donutCenterCount.textContent = data.total.toLocaleString();
-                    }
-                    
-                    if (donutTooltipCard) donutTooltipCard.style.display = 'none';
-                });
+        // Rolling last-7-days labels (dynamic — not a hardcoded week)
+        window._chartDayLabels = function() {
+            const out = [];
+            const now = new Date();
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(now);
+                d.setDate(now.getDate() - i);
+                out.push(d.toLocaleDateString([], { weekday: 'short' }));
             }
-        });
+            return out;
+        };
 
-        // 10. Hourly Distribution bar hover interactions
-        const barTooltipCard = document.getElementById('bar-tooltip-card');
-        const barTooltipHour = document.getElementById('bar-tooltip-hour');
-        const barTooltipVal = document.getElementById('bar-tooltip-val');
-        
-        const hourIntervals = [
-            "12:00 AM - 2:00 AM",
-            "2:00 AM - 4:00 AM",
-            "4:00 AM - 6:00 AM",
-            "6:00 AM - 8:00 AM",
-            "8:00 AM - 10:00 AM",
-            "10:00 AM - 12:00 PM",
-            "12:00 PM - 2:00 PM",
-            "2:00 PM - 4:00 PM",
-            "4:00 PM - 6:00 PM",
-            "6:00 PM - 8:00 PM",
-            "8:00 PM - 10:00 PM",
-            "10:00 PM - 12:00 AM"
-        ];
-        
-        const barElements = document.querySelectorAll('.chart-bar');
-        barElements.forEach(bar => {
-            bar.addEventListener('mouseenter', (e) => {
-                const idxStr = bar.getAttribute('data-bar-idx');
-                const idx = parseInt(idxStr, 10);
-                if (isNaN(idx)) return;
-                
-                const data = window.barCurrentData;
-                if (!data) return;
-                
-                const value = data.hours[idx];
-                
-                // Highlight bar
-                bar.style.opacity = '0.8';
-                
-                // Update and show Tooltip Card
-                if (barTooltipCard) {
-                    if (barTooltipHour) barTooltipHour.textContent = hourIntervals[idx];
-                    if (barTooltipVal) barTooltipVal.textContent = value;
-                    
-                    // Position over the bar
-                    const parentRect = barTooltipCard.parentElement.getBoundingClientRect();
-                    const barRect = bar.getBoundingClientRect();
-                    
-                    // Position tooltip centered above the bar
-                    const cardWidth = barTooltipCard.offsetWidth || 130;
-                    const cardHeight = barTooltipCard.offsetHeight || 50;
-                    
-                    const cardX = (barRect.left - parentRect.left) + (barRect.width / 2) - (cardWidth / 2);
-                    const cardY = (barRect.top - parentRect.top) - cardHeight - 10;
-                    
-                    barTooltipCard.style.left = `${Math.max(10, cardX)}px`;
-                    barTooltipCard.style.top = `${Math.max(10, cardY)}px`;
-                    barTooltipCard.style.display = 'block';
+        // 24-hour axis labels
+        window._hourlyLabels = function() {
+            const out = [];
+            for (let h = 0; h < 24; h++) {
+                out.push((h % 12 === 0 ? 12 : h % 12) + (h < 12 ? 'A' : 'P'));
+            }
+            return out;
+        };
+
+        window._donutTotal = 0;
+
+        // ---- Donut filter (click segment chip -> filter call logs + charts) ----
+        window.setDonutFilter = function(filter) {
+            window.appState.currentFilter = filter === 'all' ? 'all' : filter;
+            document.querySelectorAll('.donut-filter-btn').forEach(btn => {
+                const active = btn.dataset.donutFilter === filter;
+                btn.className = active
+                    ? 'donut-filter-btn px-2 py-1 rounded-full border border-primary text-primary text-label-sm font-label-sm uppercase bg-primary-fixed/20'
+                    : 'donut-filter-btn px-2 py-1 rounded-full border border-outline-variant text-on-surface-variant text-label-sm font-label-sm uppercase hover:bg-surface-container';
+            });
+            window.renderCallLogsTable();
+            window.renderFilteredCharts();
+            window.showToast(`Outcome filter: ${filter === 'all' ? 'All outcomes' : filter}`, 'info');
+        };
+
+        // ---- Custom 24h range filter for Hourly Distribution ----
+        window.applyHourlyRange = function() {
+            const fromEl = document.getElementById('hourly-from');
+            const toEl = document.getElementById('hourly-to');
+            if (!fromEl || !toEl) return;
+            const fromH = parseInt(fromEl.value, 10);
+            const toH = parseInt(toEl.value, 10);
+            if (isNaN(fromH) || isNaN(toH)) return;
+
+            // Highlight the range pill is intentionally left neutral; preset buttons clear.
+            document.querySelectorAll('.hourly-range-btn').forEach(btn => {
+                btn.className = btn.className
+                    .replace(/border-primary/g, 'border-outline-variant')
+                    .replace(/text-primary/g, 'text-on-surface-variant')
+                    .replace(/\s*bg-primary-fixed\/20/g, '')
+                    .replace(/hover:bg-surface-container/g, 'hover:bg-surface-container');
+            });
+
+            const activeSb = window.appState.currentSandbox;
+            const sandboxLeads = activeSb
+                ? window.appState.allLeads.filter(l => l.sandbox === activeSb)
+                : window.appState.allLeads;
+            let called = sandboxLeads.filter(isCalled);
+
+            // Disposition filter applies on top
+            const f = window.appState.currentFilter;
+            if (f === 'Interested') called = called.filter(l => l.disposition === 'Interested');
+            else if (f === 'Not Interested') called = called.filter(l => l.disposition === 'Not Interested');
+            else if (f === 'Callback') called = called.filter(l => l.disposition === 'Call Later' || l.disposition === 'Callback');
+            else if (f === 'Failed') called = called.filter(isFailed);
+
+            const hours = Array(24).fill(0);
+            called.forEach(l => {
+                if (l.called_at_iso) {
+                    const hour = new Date(l.called_at_iso).getHours();
+                    if (hour >= fromH && hour <= toH) hours[hour]++;
                 }
             });
-            
-            bar.addEventListener('mouseleave', () => {
-                bar.style.opacity = '1';
-                if (barTooltipCard) barTooltipCard.style.display = 'none';
-            });
-        });
+
+            const maxHr = Math.max(...hours, 1);
+            if (window.hourlyChart) {
+                window.hourlyChart.updateSeries([{ name: 'Calls', data: hours }]);
+                window.hourlyChart.updateOptions({
+                    chart: { background: 'transparent' },
+                    plotOptions: { bar: { colors: { ranges: [{ from: 0, to: 23, color: '#bd0917' }] } } }
+                });
+            }
+
+            const titleEl = document.querySelector('#hourly-distribution h2');
+            const fmt = h => ((h % 12 === 0 ? 12 : h % 12) + (h < 12 ? 'AM' : 'PM'));
+            if (titleEl) titleEl.textContent = `Hourly Distribution — ${fmt(fromH)} – ${fmt(toH)}`;
+            window.showToast(`Hourly range: ${fmt(fromH)} – ${fmt(toH)}`, 'info');
+        };
+
+        window.initApexCharts();
+        // Charts were created after the initial updateDashboardUI() call, so
+        // re-populate them with the already-loaded leads right away.
+        if (window.appState && window.appState.allLeads) {
+            window.updateDashboardUI();
+        }
     });
 
 })();

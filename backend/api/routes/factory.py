@@ -20,6 +20,16 @@ from config import settings
 from core.state import _CAMPAIGN_DATA, get_state
 from core.phone_norm import norm_phone_str as _norm_phone_str
 from core.utils import _build_opening_line
+from services.sandbox_manager import (
+    add_agent_lead,
+    associate_file_with_agent,
+    create_agent,
+    delete_agent,
+    get_agent,
+    get_agent_leads,
+    list_agents,
+    update_agent,
+)
 
 router = APIRouter(prefix="/api/factory", tags=["factory"])
 

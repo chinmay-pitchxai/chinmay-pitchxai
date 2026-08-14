@@ -75,17 +75,27 @@ def rebuild_role_kb_chunks(role: str) -> int:
     from prompts.role_prompts import get_role_rag_source_text
     from scripts.build_kb_chunks import build_chunks_from_rag
 
+    # Always drop the in-memory chunk cache first — even when the KB is
+    # cleared, the previous chunk list must never leak into the next call.
+    load_role_chunks.cache_clear()
+
     text = get_role_rag_source_text(role)
+    out = _chunks_path(role)
     if not text:
+        # Operator cleared the KB from the dashboard: remove the stale chunk
+        # file so loaders fall back to the (now empty) rag_source.txt.
+        try:
+            if out.is_file():
+                out.unlink()
+        except Exception as exc:
+            logger.warning("Failed to remove stale kb_chunks for role={}: {}", role, exc)
         return 0
     chunks = build_chunks_from_rag(text)
-    out = _chunks_path(role)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps({"role": role, "version": 1, "chunks": chunks}, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    load_role_chunks.cache_clear()
     return len(chunks)
 
 

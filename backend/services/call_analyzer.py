@@ -52,7 +52,7 @@ def _heuristic_analysis(transcript_text: str, *, gemini_error: str = "") -> dict
         err_low = gemini_error.lower()
         if "no longer available to new users" in err_low and "2.5-flash" in err_low:
             summary = (
-                "Call connected. Full AI summary unavailable: gemini-2.5-flash is blocked "
+                "Call connected. Full AI summary unavailable: gemini-3.1-flash-lite is blocked "
                 "for new Google API keys. Summaries will work once Google enables 2.5 Flash "
                 "on your key, or use an older API key with 2.5 access."
             )

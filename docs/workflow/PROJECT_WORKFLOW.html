@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Technopolis — Project Workflow Flowchart</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#020617; color:#e2e8f0;
+         font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:22px 28px 10px; border-bottom:1px solid #1e293b; }
+  h1 { margin:0; font-size:20px; letter-spacing:.5px; display:flex; align-items:center; gap:12px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#34d399;
+          box-shadow:0 0 0 0 rgba(52,211,153,.6); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.55);}
+                     70%{box-shadow:0 0 0 10px rgba(52,211,153,0);}
+                     100%{box-shadow:0 0 0 0 rgba(52,211,153,0);} }
+  .sub { color:#94a3b8; font-size:12px; margin-top:6px; }
+  .controls { position:sticky; top:0; z-index:5; background:#020617cc; backdrop-filter:blur(4px);
+              padding:8px 28px; border-bottom:1px solid #1e293b; display:flex; gap:8px; }
+  .controls button { background:#0f172a; color:#cbd5e1; border:1px solid #334155; border-radius:6px;
+                      padding:5px 12px; font-family:inherit; font-size:11px; cursor:pointer; }
+  .controls button:hover { border-color:#22d3ee; color:#22d3ee; }
+  .card { margin:18px 28px; background:#0f172a; border:1px solid #1e293b; border-radius:12px; padding:18px; }
+  .card h2 { margin:0 0 10px; font-size:14px; color:#cbd5e1; letter-spacing:1px; }
+  table { border-collapse:collapse; width:100%; font-size:11px; }
+  th,td { text-align:left; padding:6px 10px; border-bottom:1px solid #1e293b; vertical-align:top; }
+  th { color:#64748b; font-size:10px; letter-spacing:1px; text-transform:uppercase; }
+  .sw { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; }
+  .mono { color:#94a3b8; }
+  footer { padding:14px 28px 30px; color:#64748b; font-size:10.5px; }
+  .cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .cols .card { margin:0; }
+  ul { margin:6px 0 0; padding-left:18px; color:#94a3b8; font-size:11px; line-height:1.7; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot"></span>Technopolis · Vernika Bridge — Complete Project Workflow</h1>
+  <div class="sub">Node-type flowchart of the AI voice-calling pipeline · every node derived from the actual codebase ·
+  <b style="color:#e2e8f0">46 nodes</b> · <b style="color:#e2e8f0">55 connections</b> · 8 zones</div>
+</header>
+<div class="controls">
+  <button onclick="zoomAt(1.5)">+ Zoom</button>
+  <button onclick="zoomAt(1/1.5)">− Zoom</button>
+  <button onclick="fit()">Fit</button>
+  <span style="color:#475569;font-size:11px;align-self:center">wheel = zoom · drag = pan</span>
+</div>
+<div class="card">
+<svg id="map" viewBox="0 0 2400 1960" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;cursor:grab;touch-action:none;display:block">
+<defs>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
+<marker id="m-34d399" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#34d399"/></marker>
+<marker id="m-a78bfa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#a78bfa"/></marker>
+<marker id="m-fb923c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#fb923c"/></marker>
+<marker id="m-94a3b8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#94a3b8"/></marker>
+<marker id="m-fbbf24" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#fbbf24"/></marker>
+<marker id="m-c084fc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#c084fc"/></marker>
+<marker id="m-22d3ee" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#22d3ee"/></marker>
+<marker id="m-fb7185" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#fb7185"/></marker>
+</defs>
+<rect width="2400" height="1960" fill="#020617"/>
+<rect width="2400" height="1960" fill="url(#grid)"/>
+<rect x="30" y="90" width="2340" height="120" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="110" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">ENTRY — operator, customers &amp; lead feeds</text>
+<rect x="30" y="240" width="2340" height="220" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="260" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">API &amp; WEBHOOK LAYER — FastAPI routers (backend/api/routes)</text>
+<rect x="30" y="490" width="2340" height="230" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="510" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">ORCHESTRATION CORE — workflow queue &amp; autonomous dialing</text>
+<rect x="30" y="750" width="2340" height="300" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="770" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">CALL PIPELINE — Vobiz ↔ Gemini Live bridge</text>
+<rect x="30" y="1080" width="2340" height="180" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="1100" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">POST-CALL ANALYSIS — transcript → disposition</text>
+<rect x="30" y="1290" width="2340" height="200" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="1310" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">LEAD LIFECYCLE — 4-sandbox routing (SB1–SB4)</text>
+<rect x="30" y="1520" width="2340" height="160" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="1540" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">STORAGE — persistence</text>
+<rect x="30" y="1710" width="2340" height="190" rx="10" fill="rgba(2,6,23,0.55)" stroke="#334155" stroke-width="1" stroke-dasharray="7 5"/>
+<text x="44" y="1730" font-size="12" font-weight="700" fill="#cbd5e1" letter-spacing="1.5">OPERATIONS &amp; MONITORING</text>
+<line x1="380.0" y1="173.9" x2="1110.0" y2="282.9" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="707.0" y="219.3732057416268" width="76.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="745.0" y="230.8732057416268" font-size="8.5" fill="#94a3b8" text-anchor="middle">REST /api/*</text>
+<line x1="800.0" y1="150.0" x2="1620.0" y2="150.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1184.0" y="141.0" width="52.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1210.0" y="152.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">message</text>
+<line x1="1620.0" y1="175.8" x2="1070.0" y2="277.4" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1319.0" y="217.61538461538458" width="52.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1345.0" y="229.11538461538458" font-size="8.5" fill="#94a3b8" text-anchor="middle">webhook</text>
+<line x1="951.6" y1="190.0" x2="626.6" y2="380.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="742.1" y="276.0" width="94.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="789.1" y="287.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">answer_url hit</text>
+<line x1="1240.0" y1="168.7" x2="370.0" y2="285.2" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="782.0" y="217.99570815450642" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="805.0" y="229.49570815450642" font-size="8.5" fill="#94a3b8" text-anchor="middle">feeds</text>
+<line x1="223.0" y1="342.0" x2="287.0" y2="630.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="187.0" y="477.0" width="136.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="255.0" y="488.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">start / stop / config</text>
+<line x1="230.7" y1="342.0" x2="756.7" y2="1550.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="452.7" y="937.0" width="82.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="493.7" y="948.5" font-size="8.5" fill="#64748b" text-anchor="middle">leads insert</text>
+<line x1="540.6" y1="342.0" x2="243.5" y2="780.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="354.0" y="552.0" width="76.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="392.0" y="563.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">manual dial</text>
+<line x1="938.9" y1="342.0" x2="1588.4" y2="1320.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1213.7" y="822.0" width="100.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1263.7" y="833.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">inbound → reply</text>
+<line x1="268.8" y1="630.0" x2="241.2" y2="592.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="214.0" y="602.0" width="82.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="255.0" y="613.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">schedule_job</text>
+<line x1="370.0" y1="556.0" x2="410.0" y2="556.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="343.0" y="547.0" width="94.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="390.0" y="558.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">due ready jobs</text>
+<line x1="760.0" y1="556.0" x2="720.0" y2="556.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="705.0" y="547.0" width="70.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="740.0" y="558.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">P1–P9 line</text>
+<line x1="720.0" y1="556.0" x2="1110.0" y2="556.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="883.0" y="547.0" width="64.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="915.0" y="558.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">phone job</text>
+<line x1="720.0" y1="556.0" x2="1460.0" y2="556.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1049.0" y="547.0" width="82.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1090.0" y="558.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">whatsapp job</text>
+<line x1="1122.9" y1="592.0" x2="370.0" y2="782.7" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="723.4" y="678.3666666666667" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="746.4" y="689.8666666666667" font-size="8.5" fill="#94a3b8" text-anchor="middle">dial</text>
+<line x1="1615.0" y1="592.0" x2="1615.0" y2="1320.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1592.0" y="947.0" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1615.0" y="958.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">send</text>
+<line x1="815.0" y1="702.0" x2="370.0" y2="791.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="548.5" y="737.5" width="88.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="592.5" y="749.0" font-size="8.5" fill="#94a3b8" text-anchor="middle">campaign dial</text>
+<line x1="215.0" y1="864.0" x2="215.0" y2="900.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="180.0" y="873.0" width="70.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="215.0" y="884.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">POST Call/</text>
+<line x1="215.0" y1="900.0" x2="215.0" y2="452.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="180.0" y="667.0" width="70.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="215.0" y="678.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">answer_url</text>
+<line x1="240.5" y1="900.0" x2="540.9" y2="452.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="361.7" y="667.0" width="58.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="390.7" y="678.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">incoming</text>
+<line x1="266.0" y1="900.0" x2="866.7" y2="452.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="507.3" y="667.0" width="118.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="566.3" y="678.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">hangup · recording</text>
+<line x1="291.4" y1="900.0" x2="1192.6" y2="452.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="698.0" y="667.0" width="88.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="742.0" y="678.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">wss:// stream</text>
+<line x1="1245.4" y1="452.0" x2="1067.2" y2="780.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1091.3" y="607.0" width="130.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1156.3" y="618.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">handle_vobiz_ws_live</text>
+<line x1="1320.0" y1="825.3" x2="1360.0" y2="824.6" stroke="#c084fc" stroke-width="1.8" marker-start="url(#m-c084fc)" marker-end="url(#m-c084fc)"/>
+<rect x="1296.0" y="815.9473684210526" width="88.0" height="14" rx="4" fill="#0f172a" stroke="#c084fc" stroke-width="0.7"/>
+<text x="1340.0" y="827.4473684210526" font-size="8.5" fill="#c084fc" text-anchor="middle">audio 16k↔24k</text>
+<line x1="820.1" y1="880.0" x2="720.0" y2="902.8" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="735.0" y="882.378947368421" width="70.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="770.0" y="893.878947368421" font-size="8.5" fill="#94a3b8" text-anchor="middle">PCM in/out</text>
+<line x1="982.1" y1="880.0" x2="959.0" y2="900.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="935.6" y="881.0" width="70.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="970.6" y="892.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">turn logic</text>
+<line x1="1144.2" y1="880.0" x2="1185.8" y2="900.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1142.0" y="881.0" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1165.0" y="892.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">turns</text>
+<line x1="1306.2" y1="880.0" x2="1460.0" y2="908.9" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1360.1" y="885.4434782608696" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1383.1" y="896.9434782608696" font-size="8.5" fill="#94a3b8" text-anchor="middle">stream</text>
+<line x1="937.3" y1="452.0" x2="1345.2" y2="1110.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1082.3" y="772.0" width="118.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1141.3" y="783.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">finalize → analyze</text>
+<line x1="1110.0" y1="969.7" x2="400.0" y2="1115.2" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="711.0" y="1033.463768115942" width="88.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="755.0" y="1044.963768115942" font-size="8.5" fill="#94a3b8" text-anchor="middle">audio + jsonl</text>
+<line x1="400.0" y1="1150.0" x2="560.0" y2="1150.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="457.0" y="1141.0" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="480.0" y="1152.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">text</text>
+<line x1="900.0" y1="1150.0" x2="1060.0" y2="1150.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="942.0" y="1141.0" width="76.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="980.0" y="1152.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">disposition</text>
+<line x1="1316.2" y1="1190.0" x2="831.5" y2="1550.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="993.8" y="1361.0" width="160.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1073.8" y="1372.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">leads · attempts · memory</text>
+<line x1="1150.0" y1="1190.0" x2="370.0" y2="1331.8" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="725.0" y="1251.909090909091" width="70.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="760.0" y="1263.409090909091" font-size="8.5" fill="#94a3b8" text-anchor="middle">interested</text>
+<line x1="1216.7" y1="1190.0" x2="718.3" y2="1320.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="908.5" y="1246.0" width="118.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="967.5" y="1257.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">no answer / failed</text>
+<line x1="1283.3" y1="1190.0" x2="1001.7" y2="1320.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1113.5" y="1246.0" width="58.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1142.5" y="1257.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">callback</text>
+<line x1="1350.0" y1="1190.0" x2="1285.0" y2="1320.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1276.5" y="1246.0" width="82.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1317.5" y="1257.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">visit booked</text>
+<line x1="1238.1" y1="1190.0" x2="413.7" y2="1440.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="793.9" y="1306.0" width="64.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="825.9" y="1317.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">opted out</text>
+<line x1="219.6" y1="1320.0" x2="290.9" y2="702.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="202.2" y="1002.0" width="106.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="255.2" y="1013.5" font-size="8.5" fill="#64748b" text-anchor="middle">schedule WA jobs</text>
+<line x1="549.4" y1="1320.0" x2="309.0" y2="702.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="385.2" y="1002.0" width="88.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="429.2" y="1013.5" font-size="8.5" fill="#64748b" text-anchor="middle">retry 12/24wh</text>
+<line x1="879.3" y1="1320.0" x2="327.2" y2="702.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="562.2" y="1002.0" width="82.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="603.2" y="1013.5" font-size="8.5" fill="#64748b" text-anchor="middle">SB1 callback</text>
+<line x1="1209.1" y1="1320.0" x2="345.3" y2="702.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="712.2" y="1002.0" width="130.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="777.2" y="1013.5" font-size="8.5" fill="#64748b" text-anchor="middle">reminders + feedback</text>
+<line x1="295.0" y1="1440.0" x2="295.0" y2="702.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="257.0" y="1062.0" width="76.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="295.0" y="1073.5" font-size="8.5" fill="#64748b" text-anchor="middle">cancel jobs</text>
+<line x1="1619.8" y1="1320.0" x2="1755.2" y2="190.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="1664.5" y="746.0" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1687.5" y="757.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">send</text>
+<line x1="1290.9" y1="976.0" x2="1681.4" y2="1550.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="1463.1" y="1254.0" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="1486.1" y="1265.5" font-size="8.5" fill="#64748b" text-anchor="middle">JSONL</text>
+<line x1="1620.5" y1="976.0" x2="1703.9" y2="1550.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="1639.2" y="1254.0" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="1662.2" y="1265.5" font-size="8.5" fill="#64748b" text-anchor="middle">audio</text>
+<line x1="791.0" y1="1550.0" x2="1251.3" y2="342.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="989.1" y="937.0" width="64.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="1021.1" y="948.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">SQL reads</text>
+<line x1="1296.9" y1="1190.0" x2="291.8" y2="1740.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="768.3" y="1456.0" width="52.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="794.3" y="1467.5" font-size="8.5" fill="#64748b" text-anchor="middle">publish</text>
+<line x1="215.1" y1="1740.0" x2="219.9" y2="190.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="191.5" y="956.0" width="52.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="217.5" y="967.5" font-size="8.5" fill="#64748b" text-anchor="middle">WS push</text>
+<line x1="1460.0" y1="306.0" x2="370.0" y2="306.0" stroke="#fb7185" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-fb7185)"/>
+<rect x="883.0" y="297.0" width="64.0" height="14" rx="4" fill="#0f172a" stroke="#fb7185" stroke-width="0.7"/>
+<text x="915.0" y="308.5" font-size="8.5" fill="#fb7185" text-anchor="middle">JWT guard</text>
+<line x1="1460.0" y1="306.0" x2="1420.0" y2="306.0" stroke="#fb7185" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-fb7185)"/>
+<rect x="1408.0" y="297.0" width="64.0" height="14" rx="4" fill="#0f172a" stroke="#fb7185" stroke-width="0.7"/>
+<text x="1440.0" y="308.5" font-size="8.5" fill="#fb7185" text-anchor="middle">JWT guard</text>
+<line x1="720.0" y1="1782.0" x2="760.0" y2="1782.0" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#m-94a3b8)"/>
+<rect x="714.0" y="1773.0" width="52.0" height="14" rx="4" fill="#0f172a" stroke="#94a3b8" stroke-width="0.7"/>
+<text x="740.0" y="1784.5" font-size="8.5" fill="#94a3b8" text-anchor="middle">reports</text>
+<line x1="760.0" y1="1782.0" x2="720.0" y2="1782.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="717.0" y="1773.0" width="46.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="740.0" y="1784.5" font-size="8.5" fill="#64748b" text-anchor="middle">fixes</text>
+<line x1="1420.0" y1="1782.0" x2="1460.0" y2="1782.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="1393.0" y="1773.0" width="94.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="1440.0" y="1784.5" font-size="8.5" fill="#64748b" text-anchor="middle">SSH safe fixes</text>
+<line x1="1605.0" y1="1740.0" x2="1273.5" y2="342.0" stroke="#64748b" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#m-64748b)"/>
+<rect x="1386.3" y="1032.0" width="106.0" height="14" rx="4" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+<text x="1439.3" y="1043.5" font-size="8.5" fill="#64748b" text-anchor="middle">compose build+up</text>
+<rect x="60" y="110" width="320" height="80" rx="6" fill="#0f172a"/>
+<rect x="60" y="110" width="320" height="80" rx="6" fill="rgba(8,51,68,0.40)" stroke="#22d3ee" stroke-width="1.5"/>
+<rect x="60" y="110" width="4" height="80" rx="2" fill="#22d3ee"/>
+<text x="74" y="128" font-size="12.5" font-weight="700" fill="#e2e8f0">Voice Calling Dashboard</text>
+<text x="74" y="143" font-size="9.5" fill="#94a3b8">index.html + app.js + kpi_modal.js</text>
+<text x="74" y="158" font-size="9.5" fill="#94a3b8">ApexCharts · 5 nav views · live WS push</text>
+<rect x="560" y="110" width="240" height="80" rx="6" fill="#0f172a"/>
+<rect x="560" y="110" width="240" height="80" rx="6" fill="rgba(30,41,59,0.55)" stroke="#94a3b8" stroke-width="1.5"/>
+<rect x="560" y="110" width="4" height="80" rx="2" fill="#94a3b8"/>
+<text x="574" y="128" font-size="12.5" font-weight="700" fill="#e2e8f0">WhatsApp Customer</text>
+<text x="574" y="143" font-size="9.5" fill="#94a3b8">sends / receives messages</text>
+<rect x="900" y="110" width="240" height="80" rx="6" fill="#0f172a"/>
+<rect x="900" y="110" width="240" height="80" rx="6" fill="rgba(30,41,59,0.55)" stroke="#94a3b8" stroke-width="1.5"/>
+<rect x="900" y="110" width="4" height="80" rx="2" fill="#94a3b8"/>
+<text x="914" y="128" font-size="12.5" font-weight="700" fill="#e2e8f0">PSTN Caller</text>
+<text x="914" y="143" font-size="9.5" fill="#94a3b8">dials sales lines (P1–P9)</text>
+<rect x="1240" y="110" width="280" height="80" rx="6" fill="#0f172a"/>
+<rect x="1240" y="110" width="280" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1240" y="110" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="1254" y="128" font-size="12.5" font-weight="700" fill="#e2e8f0">Digital Lead Feeds</text>
+<text x="1254" y="143" font-size="9.5" fill="#94a3b8">Excel watcher + Google Sheets</text>
+<text x="1254" y="158" font-size="9.5" fill="#94a3b8">digital-excel-ingest · sheets-ingest</text>
+<rect x="1620" y="110" width="280" height="80" rx="6" fill="#0f172a"/>
+<rect x="1620" y="110" width="280" height="80" rx="6" fill="rgba(30,41,59,0.55)" stroke="#94a3b8" stroke-width="1.5"/>
+<rect x="1620" y="110" width="4" height="80" rx="2" fill="#94a3b8"/>
+<text x="1634" y="128" font-size="12.5" font-weight="700" fill="#e2e8f0">OpenWA Gateway</text>
+<text x="1634" y="143" font-size="9.5" fill="#94a3b8">linked-device WhatsApp API</text>
+<text x="1634" y="158" font-size="9.5" fill="#94a3b8">container :2786 · webhooks</text>
+<rect x="60" y="270" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="60" y="270" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="60" y="270" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="74" y="288" font-size="12.5" font-weight="700" fill="#e2e8f0">Campaign &amp; Leads API</text>
+<text x="74" y="303" font-size="9.5" fill="#94a3b8">/api/campaign/* — upload · start · stop</text>
+<text x="74" y="318" font-size="9.5" fill="#94a3b8">config · contacts · sources · kpis</text>
+<rect x="410" y="270" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="410" y="270" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="410" y="270" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="424" y="288" font-size="12.5" font-weight="700" fill="#e2e8f0">Manual Call · Callbacks · Schedules</text>
+<text x="424" y="303" font-size="9.5" fill="#94a3b8">/api/manual/call · /api/callbacks</text>
+<text x="424" y="318" font-size="9.5" fill="#94a3b8">/api/schedules · /api/cases</text>
+<rect x="760" y="270" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="760" y="270" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="760" y="270" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="774" y="288" font-size="12.5" font-weight="700" fill="#e2e8f0">WhatsApp Webhooks</text>
+<text x="774" y="303" font-size="9.5" fill="#94a3b8">/api/whatsapp/webhook · /api/openwa/webhook</text>
+<text x="774" y="318" font-size="9.5" fill="#94a3b8">proxy · send-details</text>
+<rect x="1110" y="270" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="1110" y="270" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1110" y="270" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="1124" y="288" font-size="12.5" font-weight="700" fill="#e2e8f0">Dashboard &amp; Console API</text>
+<text x="1124" y="303" font-size="9.5" fill="#94a3b8">/api/dashboard/* · /api/sandbox/*</text>
+<text x="1124" y="318" font-size="9.5" fill="#94a3b8">/api/orchestration/* · /api/tuning</text>
+<rect x="1460" y="270" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="1460" y="270" width="310" height="72" rx="6" fill="rgba(136,19,55,0.40)" stroke="#fb7185" stroke-width="1.5"/>
+<rect x="1460" y="270" width="4" height="72" rx="2" fill="#fb7185"/>
+<text x="1474" y="288" font-size="12.5" font-weight="700" fill="#e2e8f0">Auth (JWT)</text>
+<text x="1474" y="303" font-size="9.5" fill="#94a3b8">/api/login · /api/me</text>
+<text x="1474" y="318" font-size="9.5" fill="#94a3b8">console-role guard on /api/*</text>
+<rect x="60" y="380" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="60" y="380" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="60" y="380" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="74" y="398" font-size="12.5" font-weight="700" fill="#e2e8f0">Vobiz Answer URL</text>
+<text x="74" y="413" font-size="9.5" fill="#94a3b8">GET/POST /vobiz/answer</text>
+<text x="74" y="428" font-size="9.5" fill="#94a3b8">returns &lt;Stream&gt; wss:// XML</text>
+<rect x="410" y="380" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="410" y="380" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="410" y="380" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="424" y="398" font-size="12.5" font-weight="700" fill="#e2e8f0">Vobiz Incoming</text>
+<text x="424" y="413" font-size="9.5" fill="#94a3b8">GET/POST /vobiz/incoming</text>
+<text x="424" y="428" font-size="9.5" fill="#94a3b8">routes dialed DID → role</text>
+<rect x="760" y="380" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="760" y="380" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="760" y="380" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="774" y="398" font-size="12.5" font-weight="700" fill="#e2e8f0">Hangup · Recording Webhooks</text>
+<text x="774" y="413" font-size="9.5" fill="#94a3b8">/vobiz/hangup · recording-webhook</text>
+<text x="774" y="428" font-size="9.5" fill="#94a3b8">CallUUID → camp_id mapping</text>
+<rect x="1110" y="380" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="1110" y="380" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1110" y="380" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="1124" y="398" font-size="12.5" font-weight="700" fill="#e2e8f0">WS /ws/vobiz</text>
+<text x="1124" y="413" font-size="9.5" fill="#94a3b8">media WebSocket endpoint</text>
+<text x="1124" y="428" font-size="9.5" fill="#94a3b8">camp_id · agent_id · manual_role</text>
+<rect x="60" y="520" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="60" y="520" width="310" height="72" rx="6" fill="rgba(76,29,149,0.40)" stroke="#a78bfa" stroke-width="1.5"/>
+<rect x="60" y="520" width="4" height="72" rx="2" fill="#a78bfa"/>
+<text x="74" y="538" font-size="12.5" font-weight="700" fill="#e2e8f0">workflow_jobs queue</text>
+<text x="74" y="553" font-size="9.5" fill="#94a3b8">scheduled → ready → claimed → running → done</text>
+<text x="74" y="568" font-size="9.5" fill="#94a3b8">priority · due_at · eligible_pool</text>
+<rect x="410" y="520" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="410" y="520" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="410" y="520" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="424" y="538" font-size="12.5" font-weight="700" fill="#e2e8f0">Priority Dispatcher</text>
+<text x="424" y="553" font-size="9.5" fill="#94a3b8">dispatch_once · claim_next · lease</text>
+<text x="424" y="568" font-size="9.5" fill="#94a3b8">busy lock · per-line cooldown</text>
+<rect x="760" y="520" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="760" y="520" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="760" y="520" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="774" y="538" font-size="12.5" font-weight="700" fill="#e2e8f0">Number Allocator</text>
+<text x="774" y="553" font-size="9.5" fill="#94a3b8">P1–P2 cold · P3 digital · P4–P6 retry</text>
+<text x="774" y="568" font-size="9.5" fill="#94a3b8">P7–P8 nurture · P9 feedback</text>
+<rect x="1110" y="520" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="1110" y="520" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1110" y="520" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="1124" y="538" font-size="12.5" font-weight="700" fill="#e2e8f0">Phone Job Executor</text>
+<text x="1124" y="553" font-size="9.5" fill="#94a3b8">execute_phone_job → _process_single_lead</text>
+<text x="1124" y="568" font-size="9.5" fill="#94a3b8">reuses full dial/session infra</text>
+<rect x="1460" y="520" width="310" height="72" rx="6" fill="#0f172a"/>
+<rect x="1460" y="520" width="310" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1460" y="520" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="1474" y="538" font-size="12.5" font-weight="700" fill="#e2e8f0">WhatsApp Job Executor</text>
+<text x="1474" y="553" font-size="9.5" fill="#94a3b8">whatsapp_package · followup_24h</text>
+<text x="1474" y="568" font-size="9.5" fill="#94a3b8">no-reply-call scheduling</text>
+<rect x="60" y="630" width="470" height="72" rx="6" fill="#0f172a"/>
+<rect x="60" y="630" width="470" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="60" y="630" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="74" y="648" font-size="12.5" font-weight="700" fill="#e2e8f0">Orchestration Service (lifecycle)</text>
+<text x="74" y="663" font-size="9.5" fill="#94a3b8">schedule_job · failed_call · interested · opt_out</text>
+<text x="74" y="678" font-size="9.5" fill="#94a3b8">site visits · feedback · retries · lead memory</text>
+<rect x="760" y="630" width="470" height="72" rx="6" fill="#0f172a"/>
+<rect x="760" y="630" width="470" height="72" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="760" y="630" width="4" height="72" rx="2" fill="#34d399"/>
+<text x="774" y="648" font-size="12.5" font-weight="700" fill="#e2e8f0">Campaign Worker (legacy dialer)</text>
+<text x="774" y="663" font-size="9.5" fill="#94a3b8">_scheduler_loop · _campaign_worker_role</text>
+<text x="774" y="678" font-size="9.5" fill="#94a3b8">per-role dial · inter-call gap 120–180s</text>
+<rect x="60" y="780" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="60" y="780" width="310" height="84" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="60" y="780" width="4" height="84" rx="2" fill="#34d399"/>
+<text x="74" y="798" font-size="12.5" font-weight="700" fill="#e2e8f0">make_vobiz_call</text>
+<text x="74" y="813" font-size="9.5" fill="#94a3b8">REST POST /Account/{auth}/Call/</text>
+<text x="74" y="828" font-size="9.5" fill="#94a3b8">answer_url · record · hangup_url</text>
+<rect x="410" y="780" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="410" y="780" width="310" height="84" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="410" y="780" width="4" height="84" rx="2" fill="#34d399"/>
+<text x="424" y="798" font-size="12.5" font-weight="700" fill="#e2e8f0">Slot &amp; Capacity Guards</text>
+<text x="424" y="813" font-size="9.5" fill="#94a3b8">acquire/release Vobiz slot · semaphores</text>
+<text x="424" y="828" font-size="9.5" fill="#94a3b8">phone round-robin · hourly caps</text>
+<rect x="760" y="780" width="560" height="100" rx="6" fill="#0f172a"/>
+<rect x="760" y="780" width="560" height="100" rx="6" fill="rgba(88,28,135,0.35)" stroke="#c084fc" stroke-width="1.5"/>
+<rect x="760" y="780" width="4" height="100" rx="2" fill="#c084fc"/>
+<text x="774" y="798" font-size="12.5" font-weight="700" fill="#e2e8f0">Live Session — handle_vobiz_ws_live</text>
+<text x="774" y="813" font-size="9.5" fill="#94a3b8">Vobiz media ↔ Gemini Live bridge</text>
+<text x="774" y="828" font-size="9.5" fill="#94a3b8">greeting · name-verify · pitch phases · voicemail · dev-mode</text>
+<rect x="1360" y="780" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="1360" y="780" width="310" height="84" rx="6" fill="rgba(88,28,135,0.35)" stroke="#c084fc" stroke-width="1.5"/>
+<rect x="1360" y="780" width="4" height="84" rx="2" fill="#c084fc"/>
+<text x="1374" y="798" font-size="12.5" font-weight="700" fill="#e2e8f0">Gemini Live API</text>
+<text x="1374" y="813" font-size="9.5" fill="#94a3b8">models/gemini-3.1-flash-live-preview</text>
+<text x="1374" y="828" font-size="9.5" fill="#94a3b8">live setup · RAG · turn nudges</text>
+<rect x="60" y="900" width="310" height="76" rx="6" fill="#0f172a"/>
+<rect x="60" y="900" width="310" height="76" rx="6" fill="rgba(30,41,59,0.55)" stroke="#94a3b8" stroke-width="1.5"/>
+<rect x="60" y="900" width="4" height="76" rx="2" fill="#94a3b8"/>
+<text x="74" y="918" font-size="12.5" font-weight="700" fill="#e2e8f0">Vobiz Telephony API</text>
+<text x="74" y="933" font-size="9.5" fill="#94a3b8">api.vobiz.ai — dials / answers</text>
+<text x="74" y="948" font-size="9.5" fill="#94a3b8">PSTN carrier · recordings</text>
+<rect x="410" y="900" width="310" height="76" rx="6" fill="#0f172a"/>
+<rect x="410" y="900" width="310" height="76" rx="6" fill="rgba(251,146,60,0.30)" stroke="#fb923c" stroke-width="1.5"/>
+<rect x="410" y="900" width="4" height="76" rx="2" fill="#fb923c"/>
+<text x="424" y="918" font-size="12.5" font-weight="700" fill="#e2e8f0">Audio Engine</text>
+<text x="424" y="933" font-size="9.5" fill="#94a3b8">16k↔24k resample · VAD · noise suppression</text>
+<text x="424" y="948" font-size="9.5" fill="#94a3b8">greeting PCM · background mix</text>
+<rect x="760" y="900" width="310" height="76" rx="6" fill="#0f172a"/>
+<rect x="760" y="900" width="310" height="76" rx="6" fill="rgba(251,146,60,0.30)" stroke="#fb923c" stroke-width="1.5"/>
+<rect x="760" y="900" width="4" height="76" rx="2" fill="#fb923c"/>
+<text x="774" y="918" font-size="12.5" font-weight="700" fill="#e2e8f0">Turn-Taking · Voicemail</text>
+<text x="774" y="933" font-size="9.5" fill="#94a3b8">anti-loop · site-visit confirmation</text>
+<text x="774" y="948" font-size="9.5" fill="#94a3b8">voicemail screening · classify</text>
+<rect x="1110" y="900" width="310" height="76" rx="6" fill="#0f172a"/>
+<rect x="1110" y="900" width="310" height="76" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1110" y="900" width="4" height="76" rx="2" fill="#34d399"/>
+<text x="1124" y="918" font-size="12.5" font-weight="700" fill="#e2e8f0">Transcript JSONL</text>
+<text x="1124" y="933" font-size="9.5" fill="#94a3b8">append_turn per utterance</text>
+<text x="1124" y="948" font-size="9.5" fill="#94a3b8">session meta · artifacts</text>
+<rect x="1460" y="900" width="310" height="76" rx="6" fill="#0f172a"/>
+<rect x="1460" y="900" width="310" height="76" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1460" y="900" width="4" height="76" rx="2" fill="#34d399"/>
+<text x="1474" y="918" font-size="12.5" font-weight="700" fill="#e2e8f0">Call Recording</text>
+<text x="1474" y="933" font-size="9.5" fill="#94a3b8">CallRecorder · PCM/wav</text>
+<text x="1474" y="948" font-size="9.5" fill="#94a3b8">Vobiz recording ingest</text>
+<rect x="60" y="1110" width="340" height="80" rx="6" fill="#0f172a"/>
+<rect x="60" y="1110" width="340" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="60" y="1110" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="74" y="1128" font-size="12.5" font-weight="700" fill="#e2e8f0">Transcriber (STT)</text>
+<text x="74" y="1143" font-size="9.5" fill="#94a3b8">audio → text (Gemini STT)</text>
+<text x="74" y="1158" font-size="9.5" fill="#94a3b8">live JSONL passthrough</text>
+<rect x="560" y="1110" width="340" height="80" rx="6" fill="#0f172a"/>
+<rect x="560" y="1110" width="340" height="80" rx="6" fill="rgba(88,28,135,0.35)" stroke="#c084fc" stroke-width="1.5"/>
+<rect x="560" y="1110" width="4" height="80" rx="2" fill="#c084fc"/>
+<text x="574" y="1128" font-size="12.5" font-weight="700" fill="#e2e8f0">Call Analyzer</text>
+<text x="574" y="1143" font-size="9.5" fill="#94a3b8">Gemini analysis → heuristic fallback</text>
+<text x="574" y="1158" font-size="9.5" fill="#94a3b8">local analyzer · canonical disposition</text>
+<rect x="1060" y="1110" width="620" height="80" rx="6" fill="#0f172a"/>
+<rect x="1060" y="1110" width="620" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1060" y="1110" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="1074" y="1128" font-size="12.5" font-weight="700" fill="#e2e8f0">Lead Update &amp; Memory</text>
+<text x="1074" y="1143" font-size="9.5" fill="#94a3b8">status/disposition · call_attempts · lead_memory facts</text>
+<text x="1074" y="1158" font-size="9.5" fill="#94a3b8">dashboard-state invalidation · events published</text>
+<rect x="60" y="1320" width="310" height="80" rx="6" fill="#0f172a"/>
+<rect x="60" y="1320" width="310" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="60" y="1320" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="74" y="1338" font-size="12.5" font-weight="700" fill="#e2e8f0">Interested → Sandbox 3</text>
+<text x="74" y="1353" font-size="9.5" fill="#94a3b8">WhatsApp package + 24h followup</text>
+<text x="74" y="1368" font-size="9.5" fill="#94a3b8">no-reply call after 2–3 wh</text>
+<rect x="410" y="1320" width="310" height="80" rx="6" fill="#0f172a"/>
+<rect x="410" y="1320" width="310" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="410" y="1320" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="424" y="1338" font-size="12.5" font-weight="700" fill="#e2e8f0">Failed / No-Answer → Sandbox 2</text>
+<text x="424" y="1353" font-size="9.5" fill="#94a3b8">retry after 12/24 working hours</text>
+<text x="424" y="1368" font-size="9.5" fill="#94a3b8">attempt 3 → lost (P4–P6)</text>
+<rect x="760" y="1320" width="310" height="80" rx="6" fill="#0f172a"/>
+<rect x="760" y="1320" width="310" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="760" y="1320" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="774" y="1338" font-size="12.5" font-weight="700" fill="#e2e8f0">Callback Requested → Sandbox 1</text>
+<text x="774" y="1353" font-size="9.5" fill="#94a3b8">scheduled callback via P1–P3</text>
+<text x="774" y="1368" font-size="9.5" fill="#94a3b8">bounded relationship retry</text>
+<rect x="1110" y="1320" width="310" height="80" rx="6" fill="#0f172a"/>
+<rect x="1110" y="1320" width="310" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1110" y="1320" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="1124" y="1338" font-size="12.5" font-weight="700" fill="#e2e8f0">Site Visit → Sandbox 3/4</text>
+<text x="1124" y="1353" font-size="9.5" fill="#94a3b8">day-before + morning reminders</text>
+<text x="1124" y="1368" font-size="9.5" fill="#94a3b8">completed → feedback P9</text>
+<rect x="1460" y="1320" width="310" height="80" rx="6" fill="#0f172a"/>
+<rect x="1460" y="1320" width="310" height="80" rx="6" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.5"/>
+<rect x="1460" y="1320" width="4" height="80" rx="2" fill="#34d399"/>
+<text x="1474" y="1338" font-size="12.5" font-weight="700" fill="#e2e8f0">WhatsApp Senders</text>
+<text x="1474" y="1353" font-size="9.5" fill="#94a3b8">brochure package · templates</text>
+<text x="1474" y="1368" font-size="9.5" fill="#94a3b8">disposition messages · followups</text>
+<rect x="60" y="1440" width="470" height="72" rx="6" fill="#0f172a"/>
+<rect x="60" y="1440" width="470" height="72" rx="6" fill="rgba(136,19,55,0.40)" stroke="#fb7185" stroke-width="1.5"/>
+<rect x="60" y="1440" width="4" height="72" rx="2" fill="#fb7185"/>
+<text x="74" y="1458" font-size="12.5" font-weight="700" fill="#e2e8f0">DNC / Opt-out Register</text>
+<text x="74" y="1473" font-size="9.5" fill="#94a3b8">do_not_contact · cancels lead jobs</text>
+<text x="74" y="1488" font-size="9.5" fill="#94a3b8">TRAI compliance guard</text>
+<rect x="60" y="1550" width="1430" height="84" rx="6" fill="#0f172a"/>
+<rect x="60" y="1550" width="1430" height="84" rx="6" fill="rgba(76,29,149,0.40)" stroke="#a78bfa" stroke-width="1.5"/>
+<rect x="60" y="1550" width="4" height="84" rx="2" fill="#a78bfa"/>
+<text x="74" y="1568" font-size="12.5" font-weight="700" fill="#e2e8f0">PostgreSQL 16 (prod) · SQLite (dev)</text>
+<text x="74" y="1583" font-size="9.5" fill="#94a3b8">leads · workflow_jobs · call_attempts · lead_memory · site_visits · feedback_records</text>
+<text x="74" y="1598" font-size="9.5" fill="#94a3b8">do_not_contact · whatsapp_messages · camp_sessions · vobiz_call_map · schedules · cases</text>
+<rect x="1540" y="1550" width="340" height="84" rx="6" fill="#0f172a"/>
+<rect x="1540" y="1550" width="340" height="84" rx="6" fill="rgba(76,29,149,0.40)" stroke="#a78bfa" stroke-width="1.5"/>
+<rect x="1540" y="1550" width="4" height="84" rx="2" fill="#a78bfa"/>
+<text x="1554" y="1568" font-size="12.5" font-weight="700" fill="#e2e8f0">Media Store</text>
+<text x="1554" y="1583" font-size="9.5" fill="#94a3b8">recordings/ · transcripts/</text>
+<text x="1554" y="1598" font-size="9.5" fill="#94a3b8">greeting PCM · JSONL</text>
+<rect x="60" y="1740" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="60" y="1740" width="310" height="84" rx="6" fill="rgba(251,146,60,0.30)" stroke="#fb923c" stroke-width="1.5"/>
+<rect x="60" y="1740" width="4" height="84" rx="2" fill="#fb923c"/>
+<text x="74" y="1758" font-size="12.5" font-weight="700" fill="#e2e8f0">Event Bus · WS Push</text>
+<text x="74" y="1773" font-size="9.5" fill="#94a3b8">/ws/dashboard · /api/events/stream</text>
+<text x="74" y="1788" font-size="9.5" fill="#94a3b8">lead/call events → UI</text>
+<rect x="410" y="1740" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="410" y="1740" width="310" height="84" rx="6" fill="rgba(120,53,15,0.30)" stroke="#fbbf24" stroke-width="1.5"/>
+<rect x="410" y="1740" width="4" height="84" rx="2" fill="#fbbf24"/>
+<text x="424" y="1758" font-size="12.5" font-weight="700" fill="#e2e8f0">Health Agents</text>
+<text x="424" y="1773" font-size="9.5" fill="#94a3b8">10 self-healing agents</text>
+<text x="424" y="1788" font-size="9.5" fill="#94a3b8">concurrency · media · RAG · scheduling…</text>
+<rect x="760" y="1740" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="760" y="1740" width="310" height="84" rx="6" fill="rgba(120,53,15,0.30)" stroke="#fbbf24" stroke-width="1.5"/>
+<rect x="760" y="1740" width="4" height="84" rx="2" fill="#fbbf24"/>
+<text x="774" y="1758" font-size="12.5" font-weight="700" fill="#e2e8f0">Super Boss · Panther</text>
+<text x="774" y="1773" font-size="9.5" fill="#94a3b8">parent supervisor · auto-fix loop</text>
+<text x="774" y="1788" font-size="9.5" fill="#94a3b8">prompts · cleanup</text>
+<rect x="1110" y="1740" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="1110" y="1740" width="310" height="84" rx="6" fill="rgba(120,53,15,0.30)" stroke="#fbbf24" stroke-width="1.5"/>
+<rect x="1110" y="1740" width="4" height="84" rx="2" fill="#fbbf24"/>
+<text x="1124" y="1758" font-size="12.5" font-weight="700" fill="#e2e8f0">Hermes Watchdog (5-min cron)</text>
+<text x="1124" y="1773" font-size="9.5" fill="#94a3b8">VPS sensor script · SSH runner</text>
+<text x="1124" y="1788" font-size="9.5" fill="#94a3b8">safe fixes · TTS alert</text>
+<rect x="1460" y="1740" width="310" height="84" rx="6" fill="#0f172a"/>
+<rect x="1460" y="1740" width="310" height="84" rx="6" fill="rgba(120,53,15,0.30)" stroke="#fbbf24" stroke-width="1.5"/>
+<rect x="1460" y="1740" width="4" height="84" rx="2" fill="#fbbf24"/>
+<text x="1474" y="1758" font-size="12.5" font-weight="700" fill="#e2e8f0">Deploy · Docker Stack</text>
+<text x="1474" y="1773" font-size="9.5" fill="#94a3b8">tar+scp → compose build+up</text>
+<text x="1474" y="1788" font-size="9.5" fill="#94a3b8">Caddy TLS/WSS · VPS host</text>
+<g id="legend">
+<text x="60" y="1925" font-size="11" font-weight="700" fill="#cbd5e1">LEGEND</text>
+<rect x="130" y="1912" width="16" height="10" rx="3" fill="rgba(8,51,68,0.40)" stroke="#22d3ee" stroke-width="1.2"/>
+<text x="152" y="1921" font-size="9.5" fill="#94a3b8">Frontend</text>
+<rect x="280" y="1912" width="16" height="10" rx="3" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="1.2"/>
+<text x="302" y="1921" font-size="9.5" fill="#94a3b8">Backend</text>
+<rect x="430" y="1912" width="16" height="10" rx="3" fill="rgba(76,29,149,0.40)" stroke="#a78bfa" stroke-width="1.2"/>
+<text x="452" y="1921" font-size="9.5" fill="#94a3b8">Storage / Data</text>
+<rect x="580" y="1912" width="16" height="10" rx="3" fill="rgba(30,41,59,0.55)" stroke="#94a3b8" stroke-width="1.2"/>
+<text x="602" y="1921" font-size="9.5" fill="#94a3b8">External</text>
+<rect x="730" y="1912" width="16" height="10" rx="3" fill="rgba(88,28,135,0.35)" stroke="#c084fc" stroke-width="1.2"/>
+<text x="752" y="1921" font-size="9.5" fill="#94a3b8">AI / Gemini Live</text>
+<rect x="880" y="1912" width="16" height="10" rx="3" fill="rgba(251,146,60,0.30)" stroke="#fb923c" stroke-width="1.2"/>
+<text x="902" y="1921" font-size="9.5" fill="#94a3b8">Media / Events</text>
+<rect x="1030" y="1912" width="16" height="10" rx="3" fill="rgba(136,19,55,0.40)" stroke="#fb7185" stroke-width="1.2"/>
+<text x="1052" y="1921" font-size="9.5" fill="#94a3b8">Security / Compliance</text>
+<rect x="1180" y="1912" width="16" height="10" rx="3" fill="rgba(120,53,15,0.30)" stroke="#fbbf24" stroke-width="1.2"/>
+<text x="1202" y="1921" font-size="9.5" fill="#94a3b8">Ops / Monitoring</text>
+</g>
+</svg>
+</div>
+<div class="cols">
+  <div class="card"><h2>▶ How a call flows</h2><ul>
+    <li>Operator uploads leads → <span class="mono">leads</span> → FRESH_CALL jobs → dispatcher claims → number allocator picks P1–P9 line → dial.</li>
+    <li>Vobiz answers → <span class="mono">/vobiz/answer</span> returns wss XML → <span class="mono">/ws/vobiz</span> → live session bridges audio to Gemini Live.</li>
+    <li>Hangup webhook → transcript → analyzer → disposition → 4-sandbox lifecycle schedules retries / WhatsApp / callbacks / feedback.</li>
+  </ul></div>
+  <div class="card"><h2>▶ Pipeline guardrails</h2><ul>
+    <li>DNC / opt-out register blocks callbacks &amp; jobs (TRAI).</li>
+    <li>Slot guards, semaphores, inter-call gap (120–180s), hourly caps, line cooldown.</li>
+    <li>Strict lead-stage transition machine (<span class="mono">workflow_models.py</span>).</li>
+  </ul></div>
+  <div class="card"><h2>▶ Ops &amp; delivery</h2><ul>
+    <li>Docker stack: technopoliss · openwa · postgres · caddy on VPS.</li>
+    <li>Self-healing: 10 health agents → Super Boss → Panther; Hermes watchdog cron.</li>
+    <li>Deploy: tar+scp → <span class="mono">docker compose build &amp;&amp; up -d</span> (frontend baked into image).</li>
+  </ul></div>
+</div>
+<div class="card">
+  <h2>Node index (id → role → source files)</h2>
+  <table>
+    <thead><tr><th>#</th><th>Node</th><th>Component</th><th>Layer</th><th>Key files (as read)</th></tr></thead>
+    <tbody>
+<tr><td>1</td><td><span class='sw' style='background:#22d3ee'></span><b>fe_dashboard</b></td><td>Voice Calling Dashboard</td><td>Frontend</td><td class='mono'>index.html, app.js, kpi_modal.js, index.css</td></tr>
+<tr><td>2</td><td><span class='sw' style='background:#94a3b8'></span><b>ext_wa_customer</b></td><td>WhatsApp Customer</td><td>External</td><td class='mono'>—</td></tr>
+<tr><td>3</td><td><span class='sw' style='background:#94a3b8'></span><b>ext_pstn</b></td><td>PSTN Caller</td><td>External</td><td class='mono'>—</td></tr>
+<tr><td>4</td><td><span class='sw' style='background:#34d399'></span><b>feed_digital</b></td><td>Digital Lead Feeds</td><td>Backend</td><td class='mono'>services/digital_excel_ingest.py, services/google_sheets_ingest.py</td></tr>
+<tr><td>5</td><td><span class='sw' style='background:#94a3b8'></span><b>ext_openwa</b></td><td>OpenWA Gateway</td><td>External</td><td class='mono'>docker-compose.yml (openwa service)</td></tr>
+<tr><td>6</td><td><span class='sw' style='background:#34d399'></span><b>api_campaign</b></td><td>Campaign &amp; Leads API</td><td>Backend</td><td class='mono'>routes/campaign.py</td></tr>
+<tr><td>7</td><td><span class='sw' style='background:#34d399'></span><b>api_manual</b></td><td>Manual Call · Callbacks · Schedules</td><td>Backend</td><td class='mono'>routes/console_api.py, routes/callbacks.py, routes/schedules.py</td></tr>
+<tr><td>8</td><td><span class='sw' style='background:#34d399'></span><b>api_whatsapp</b></td><td>WhatsApp Webhooks</td><td>Backend</td><td class='mono'>routes/whatsapp.py, routes/whatsapp_proxy.py</td></tr>
+<tr><td>9</td><td><span class='sw' style='background:#34d399'></span><b>api_dashboard</b></td><td>Dashboard &amp; Console API</td><td>Backend</td><td class='mono'>routes/dashboard.py, sandbox_overview.py, orchestration.py, console_api.py</td></tr>
+<tr><td>10</td><td><span class='sw' style='background:#fb7185'></span><b>api_auth</b></td><td>Auth (JWT)</td><td>Security / Compliance</td><td class='mono'>routes/auth_api.py, core/auth.py</td></tr>
+<tr><td>11</td><td><span class='sw' style='background:#34d399'></span><b>api_vobiz_answer</b></td><td>Vobiz Answer URL</td><td>Backend</td><td class='mono'>routes/vobiz.py (answer)</td></tr>
+<tr><td>12</td><td><span class='sw' style='background:#34d399'></span><b>api_vobiz_incoming</b></td><td>Vobiz Incoming</td><td>Backend</td><td class='mono'>routes/vobiz.py (incoming)</td></tr>
+<tr><td>13</td><td><span class='sw' style='background:#34d399'></span><b>api_hangup</b></td><td>Hangup · Recording Webhooks</td><td>Backend</td><td class='mono'>routes/vobiz.py (hangup/recording)</td></tr>
+<tr><td>14</td><td><span class='sw' style='background:#34d399'></span><b>api_ws_vobiz</b></td><td>WS /ws/vobiz</td><td>Backend</td><td class='mono'>routes/vobiz.py (websocket)</td></tr>
+<tr><td>15</td><td><span class='sw' style='background:#a78bfa'></span><b>orch_queue</b></td><td>workflow_jobs queue</td><td>Storage / Data</td><td class='mono'>core/workflow_queue.py, core/workflow_models.py</td></tr>
+<tr><td>16</td><td><span class='sw' style='background:#34d399'></span><b>orch_dispatcher</b></td><td>Priority Dispatcher</td><td>Backend</td><td class='mono'>core/orchestration_dispatcher.py</td></tr>
+<tr><td>17</td><td><span class='sw' style='background:#34d399'></span><b>orch_alloc</b></td><td>Number Allocator</td><td>Backend</td><td class='mono'>core/number_allocator.py</td></tr>
+<tr><td>18</td><td><span class='sw' style='background:#34d399'></span><b>orch_exec_phone</b></td><td>Phone Job Executor</td><td>Backend</td><td class='mono'>core/live_job_executor.py</td></tr>
+<tr><td>19</td><td><span class='sw' style='background:#34d399'></span><b>orch_exec_wa</b></td><td>WhatsApp Job Executor</td><td>Backend</td><td class='mono'>core/live_job_executor.py</td></tr>
+<tr><td>20</td><td><span class='sw' style='background:#34d399'></span><b>orch_service</b></td><td>Orchestration Service (lifecycle)</td><td>Backend</td><td class='mono'>core/orchestration_service.py</td></tr>
+<tr><td>21</td><td><span class='sw' style='background:#34d399'></span><b>legacy_worker</b></td><td>Campaign Worker (legacy dialer)</td><td>Backend</td><td class='mono'>core/worker.py</td></tr>
+<tr><td>22</td><td><span class='sw' style='background:#34d399'></span><b>dial_make</b></td><td>make_vobiz_call</td><td>Backend</td><td class='mono'>services/vobiz_bridge/vobiz_client.py</td></tr>
+<tr><td>23</td><td><span class='sw' style='background:#34d399'></span><b>dial_slots</b></td><td>Slot &amp; Capacity Guards</td><td>Backend</td><td class='mono'>core/state.py, core/worker.py</td></tr>
+<tr><td>24</td><td><span class='sw' style='background:#c084fc'></span><b>live_session</b></td><td>Live Session — handle_vobiz_ws_live</td><td>AI / Gemini Live</td><td class='mono'>services/vobiz_bridge/live_session.py</td></tr>
+<tr><td>25</td><td><span class='sw' style='background:#c084fc'></span><b>live_gemini</b></td><td>Gemini Live API</td><td>AI / Gemini Live</td><td class='mono'>services/vobiz_bridge/gemini_protocol.py, core/gemini_auth.py</td></tr>
+<tr><td>26</td><td><span class='sw' style='background:#94a3b8'></span><b>ext_vobiz</b></td><td>Vobiz Telephony API</td><td>External</td><td class='mono'>backend/.env (credentials)</td></tr>
+<tr><td>27</td><td><span class='sw' style='background:#fb923c'></span><b>live_audio</b></td><td>Audio Engine</td><td>Media / Events</td><td class='mono'>services/vobiz_bridge/audio.py</td></tr>
+<tr><td>28</td><td><span class='sw' style='background:#fb923c'></span><b>live_turns</b></td><td>Turn-Taking · Voicemail</td><td>Media / Events</td><td class='mono'>services/vobiz_bridge/turn_taking_addon.py, voicemail.py</td></tr>
+<tr><td>29</td><td><span class='sw' style='background:#34d399'></span><b>live_transcript</b></td><td>Transcript JSONL</td><td>Backend</td><td class='mono'>services/conversation_log.py</td></tr>
+<tr><td>30</td><td><span class='sw' style='background:#34d399'></span><b>live_record</b></td><td>Call Recording</td><td>Backend</td><td class='mono'>services/call_recording.py, services/vobiz_bridge/vobiz_recording.py</td></tr>
+<tr><td>31</td><td><span class='sw' style='background:#34d399'></span><b>an_transcriber</b></td><td>Transcriber (STT)</td><td>Backend</td><td class='mono'>services/transcriber.py</td></tr>
+<tr><td>32</td><td><span class='sw' style='background:#c084fc'></span><b>an_analyzer</b></td><td>Call Analyzer</td><td>AI / Gemini Live</td><td class='mono'>services/call_analyzer.py, services/gemini_analyzer.py</td></tr>
+<tr><td>33</td><td><span class='sw' style='background:#34d399'></span><b>an_lead_update</b></td><td>Lead Update &amp; Memory</td><td>Backend</td><td class='mono'>core/worker.py (_analyze_and_update_lead), core/lead_memory.py</td></tr>
+<tr><td>34</td><td><span class='sw' style='background:#34d399'></span><b>lc_interested</b></td><td>Interested → Sandbox 3</td><td>Backend</td><td class='mono'>core/orchestration_service.py (interested)</td></tr>
+<tr><td>35</td><td><span class='sw' style='background:#34d399'></span><b>lc_failed</b></td><td>Failed / No-Answer → Sandbox 2</td><td>Backend</td><td class='mono'>core/orchestration_service.py (failed_call)</td></tr>
+<tr><td>36</td><td><span class='sw' style='background:#34d399'></span><b>lc_callback</b></td><td>Callback Requested → Sandbox 1</td><td>Backend</td><td class='mono'>core/orchestration_service.py (schedule_callback)</td></tr>
+<tr><td>37</td><td><span class='sw' style='background:#34d399'></span><b>lc_sitevisit</b></td><td>Site Visit → Sandbox 3/4</td><td>Backend</td><td class='mono'>core/orchestration_service.py (schedule_site_visit)</td></tr>
+<tr><td>38</td><td><span class='sw' style='background:#34d399'></span><b>lc_whatsapp</b></td><td>WhatsApp Senders</td><td>Backend</td><td class='mono'>services/whatsapp/*, services/whatsapp_leads.py</td></tr>
+<tr><td>39</td><td><span class='sw' style='background:#fb7185'></span><b>lc_optout</b></td><td>DNC / Opt-out Register</td><td>Security / Compliance</td><td class='mono'>core/dnc.py, core/orchestration_service.py (opt_out)</td></tr>
+<tr><td>40</td><td><span class='sw' style='background:#a78bfa'></span><b>db_pg</b></td><td>PostgreSQL 16 (prod) · SQLite (dev)</td><td>Storage / Data</td><td class='mono'>core/storage.py, core/db.py</td></tr>
+<tr><td>41</td><td><span class='sw' style='background:#a78bfa'></span><b>db_media</b></td><td>Media Store</td><td>Storage / Data</td><td class='mono'>backend/media/, data/</td></tr>
+<tr><td>42</td><td><span class='sw' style='background:#fb923c'></span><b>ops_events</b></td><td>Event Bus · WS Push</td><td>Media / Events</td><td class='mono'>core/events.py, routes/events.py</td></tr>
+<tr><td>43</td><td><span class='sw' style='background:#fbbf24'></span><b>ops_health</b></td><td>Health Agents</td><td>Ops / Monitoring</td><td class='mono'>services/health_agents/</td></tr>
+<tr><td>44</td><td><span class='sw' style='background:#fbbf24'></span><b>ops_boss</b></td><td>Super Boss · Panther</td><td>Ops / Monitoring</td><td class='mono'>services/supervisor/</td></tr>
+<tr><td>45</td><td><span class='sw' style='background:#fbbf24'></span><b>ops_watchdog</b></td><td>Hermes Watchdog (5-min cron)</td><td>Ops / Monitoring</td><td class='mono'>watchdog/</td></tr>
+<tr><td>46</td><td><span class='sw' style='background:#fbbf24'></span><b>ops_deploy</b></td><td>Deploy · Docker Stack</td><td>Ops / Monitoring</td><td class='mono'>deploy_vps.sh, docker-compose.yml, Caddyfile, Dockerfile</td></tr>
+    </tbody>
+  </table>
+</div>
+<footer>Generated from a full codebase read · branch <span class="mono">deploy/technopolis-v1</span> ·
+backend/main.py → api/app.py registers all routers · regen with <span class="mono">python docs/workflow/generate_workflow.py</span></footer>
+<script>
+(function(){
+  var svg=document.getElementById('map');
+  var W=2400,H=1960;
+  var k=1,tx=0,ty=0;
+  function apply(){ svg.setAttribute('viewBox', tx+' '+ty+' '+(W/k)+' '+(H/k)); }
+  function zoomAt(f,cx,cy){
+    if(!cx||!cy){
+      var r=svg.getBoundingClientRect();
+      cx=r.width/2; cy=r.height/2;
+    }
+    var vx=tx+cx*(W/k)/ (svg.clientWidth||W);
+    var vy=ty+cy*(H/k)/ (svg.clientHeight||H);
+    var nk=Math.min(6,Math.max(0.25,k*f));
+    tx=vx-(vx-tx)*(nk/k); ty=vy-(vy-ty)*(nk/k); k=nk; apply();
+  }
+  function fit(){ k=1;tx=0;ty=0;apply(); }
+  svg.addEventListener('wheel',function(e){
+    e.preventDefault();
+    var r=svg.getBoundingClientRect();
+    zoomAt(e.deltaY<0?1.2:1/1.2, e.clientX-r.left, e.clientY-r.top);
+  },{passive:false});
+  var drag=false,sx=0,sy=0,stx=0,sty=0;
+  svg.addEventListener('pointerdown',function(e){drag=true;sx=e.clientX;sy=e.clientY;stx=tx;sty=ty;svg.style.cursor='grabbing';});
+  window.addEventListener('pointermove',function(e){if(!drag)return;tx=stx-(e.clientX-sx)*(W/k)/ (svg.clientWidth||W);ty=sty-(e.clientY-sy)*(H/k)/ (svg.clientHeight||H);apply();});
+  window.addEventListener('pointerup',function(){drag=false;svg.style.cursor='grab';});
+  window.zoomAt=zoomAt; window.fit=fit;
+})();
+</script>
+</body>
+</html>

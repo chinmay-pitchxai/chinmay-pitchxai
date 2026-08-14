@@ -141,7 +141,7 @@ async def transcribe_audio(log_id: str, role: str = "sales_1") -> str | None:
 
     from prompts.role_prompts import extract_agent_name
     agent_name = extract_agent_name(role) or "the sales agent from Technopolis Constructions"
-    model = (settings.gemini_transcription_model or "gemini-2.5-flash").strip()
+    model = (settings.gemini_transcription_model or "gemini-3.1-flash-lite").strip()
     url = gemini_generate_content_url(model)
 
     with open(fp, "rb") as f:

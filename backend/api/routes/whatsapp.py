@@ -20,6 +20,33 @@ from services.whatsapp_leads import (
 
 router = APIRouter(tags=["whatsapp"])
 
+# Bounded LRU of recently processed Meta webhook message ids — Meta re-delivers
+# events on retry/timeout, so a seen id is dropped (idempotent webhook).
+import threading
+from collections import OrderedDict
+
+_MESSAGE_ID_LOCK = threading.Lock()
+_MESSAGE_ID_CACHE: OrderedDict[str, None] = OrderedDict()
+_MESSAGE_ID_MAX = 2000
+
+
+class _MessageIdCache:
+    """Thread-safe bounded set of recently seen webhook message ids."""
+
+    def __contains__(self, message_id: str) -> bool:
+        with _MESSAGE_ID_LOCK:
+            return message_id in _MESSAGE_ID_CACHE
+
+    def add(self, message_id: str) -> None:
+        with _MESSAGE_ID_LOCK:
+            _MESSAGE_ID_CACHE[message_id] = None
+            _MESSAGE_ID_CACHE.move_to_end(message_id)
+            while len(_MESSAGE_ID_CACHE) > _MESSAGE_ID_MAX:
+                _MESSAGE_ID_CACHE.popitem(last=False)
+
+
+_message_id_cache = _MessageIdCache()
+
 
 @router.get("/api/whatsapp/webhook")
 async def whatsapp_webhook_verify(
@@ -55,6 +82,10 @@ async def whatsapp_webhook_events(request: Request):
     if not messages:
         return {"status": "ok", "processed": 0}
 
+    # Idempotency: Meta re-delivers webhook events on retry/timeout. A message
+    # id already processed in this process (LRU) is dropped so duplicate lead
+    # updates and duplicate WhatsApp replies can never happen.
+    dedup = _message_id_cache
     results = []
     for msg in messages:
         from_phone = msg["from"]
@@ -62,6 +93,11 @@ async def whatsapp_webhook_events(request: Request):
         message_text = msg.get("text") or ""
         wa_message_id = msg.get("message_id") or ""
         result = {}
+        if wa_message_id:
+            if wa_message_id in dedup:
+                results.append({"status": "ok", "processed": 0, "dedup": True, "message_id": wa_message_id})
+                continue
+            dedup.add(wa_message_id)
         try:
             # Step 1: Process lead (match/create/update lead record)
             result = await process_whatsapp_inbound(
@@ -72,47 +108,50 @@ async def whatsapp_webhook_events(request: Request):
             )
         except Exception as e:
             logger.exception("WhatsApp lead ingest failed: {}", e)
-            result = {"error": str(e)}
+            # Ingest failure must NOT fall through to the AI reply step (the
+            # lead may not exist yet) — mark ignored so auto-reply is skipped.
+            result = {"ignored": True, "error": str(e)}
 
         # Step 2: AI chatbot auto-reply with conversation memory
-        try:
-            from services.whatsapp_conversation import add_message, analyze_inbound_message
-            from services.whatsapp_leads import send_whatsapp_project_details
-
-            # Store user message in conversation memory
-            add_message(from_phone, "user", message_text)
-
-            # Analyze with Gemini (uses conversation history + RAG + lead context)
-            ai_result = await analyze_inbound_message(from_phone, message_text)
-
-            # Send AI text response if warranted
-            if ai_result.get("should_respond") and ai_result.get("response"):
-                from services.whatsapp_leads import send_whatsapp_text_message
-                await send_whatsapp_text_message(from_phone, ai_result["response"])
-                # Store assistant response in conversation memory
-                add_message(from_phone, "assistant", ai_result["response"])
-                result["ai_responded"] = True
-                result["ai_response"] = ai_result["response"][:120]
-            else:
-                result["ai_responded"] = False
-
-            # Optionally send brochure/project details
-            if ai_result.get("send_project_details"):
-                await send_whatsapp_project_details(from_phone)
-                result["ai_sent_details"] = True
-
-            # Publish event for dashboard reflection
+        if not result.get("ignored"):
             try:
-                from core.events import get_event_bus
-                await get_event_bus().publish("whatsapp_inbound", role="sales_1",
-                    phone=from_phone, message=message_text[:100],
-                    ai_replied=result.get("ai_responded", False))
-            except Exception:
-                pass
+                from services.whatsapp_conversation import add_message, analyze_inbound_message
+                from services.whatsapp_leads import send_whatsapp_project_details
 
-        except Exception as e:
-            logger.warning("WhatsApp AI chatbot failed for {}: {}", from_phone, e)
-            result["ai_error"] = str(e)
+                # Store user message in conversation memory
+                add_message(from_phone, "user", message_text)
+
+                # Analyze with Gemini (uses conversation history + RAG + lead context)
+                ai_result = await analyze_inbound_message(from_phone, message_text)
+
+                # Send AI text response if warranted
+                if ai_result.get("should_respond") and ai_result.get("response"):
+                    from services.whatsapp_leads import send_whatsapp_text_message
+                    await send_whatsapp_text_message(from_phone, ai_result["response"])
+                    # Store assistant response in conversation memory
+                    add_message(from_phone, "assistant", ai_result["response"])
+                    result["ai_responded"] = True
+                    result["ai_response"] = ai_result["response"][:120]
+                else:
+                    result["ai_responded"] = False
+
+                # Optionally send brochure/project details
+                if ai_result.get("send_project_details"):
+                    await send_whatsapp_project_details(from_phone)
+                    result["ai_sent_details"] = True
+
+                # Publish event for dashboard reflection
+                try:
+                    from core.events import get_event_bus
+                    await get_event_bus().publish("whatsapp_inbound", role="sales_1",
+                        phone=from_phone, message=message_text[:100],
+                        ai_replied=result.get("ai_responded", False))
+                except Exception:
+                    pass
+
+            except Exception as e:
+                logger.warning("WhatsApp AI chatbot failed for {}: {}", from_phone, e)
+                result["ai_error"] = str(e)
 
         results.append(result)
 

@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+import os
+import sys
 import tempfile
 import threading
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import helpers  # noqa: E402  (Postgres test DB + reset)
 
 from core.business_hours import add_working_hours
 from core.number_allocator import allocate_number, configured_pools, pool_for, relationship_number_for_source, validate_live_pools
 from core.workflow_models import JobType, LeadStage, NumberPool, can_transition
 from core.workflow_queue import claim_next, complete_job, create_job, promote_due
 from core.orchestration_dispatcher import dispatch_once
-from core.storage import init_db
+from core.storage import close_db, init_db
 from core.orchestration_service import (
     complete_site_visit, failed_call, feedback_no_answer, interested, opt_out,
     record_feedback, relationship_no_answer, reschedule_site_visit, schedule_callback,
@@ -23,19 +27,7 @@ from core.orchestration_service import (
 )
 
 
-SCHEMA = """
-CREATE TABLE leads(id INTEGER PRIMARY KEY, phone TEXT, role TEXT DEFAULT 'campaign', source TEXT DEFAULT 'campaign');
-CREATE TABLE do_not_contact(normalized_phone TEXT PRIMARY KEY, lead_id INTEGER);
-CREATE TABLE workflow_jobs(
- id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER NOT NULL, job_type TEXT NOT NULL,
- source_type TEXT NOT NULL DEFAULT '', source_id TEXT NOT NULL DEFAULT '', priority INTEGER NOT NULL,
- status TEXT NOT NULL DEFAULT 'scheduled', due_at_utc REAL NOT NULL, eligible_pool TEXT NOT NULL,
- attempt_number INTEGER NOT NULL DEFAULT 0 CHECK(attempt_number BETWEEN 0 AND 3),
- claimed_by_number TEXT, claim_token TEXT, claimed_at REAL, lease_expires_at REAL,
- idempotency_key TEXT NOT NULL UNIQUE, payload_json TEXT NOT NULL DEFAULT '{}', error TEXT DEFAULT '',
- created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
-);
-"""
+SCHEMA = None  # schema now lives in the primary PostgreSQL store (init_db)
 
 
 class StateTests(unittest.TestCase):
@@ -126,17 +118,24 @@ class WorkingHoursTests(unittest.TestCase):
 class QueueTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.path = Path(self.tmp.name) / "q.db"
-        conn = sqlite3.connect(self.path)
-        conn.executescript(SCHEMA)
-        conn.execute("INSERT INTO leads(id,phone) VALUES(1,'9999999999')")
-        conn.commit(); conn.close()
+        init_db(self.tmp.name)  # ensures the full operational schema exists
+        helpers.reset_operational_tables()
+        c = helpers.connect()
+        try:
+            c.execute("INSERT INTO leads(id,phone,role) VALUES(1,'9999999999','campaign')")
+            c.commit()
+        finally:
+            c.close()
 
     def tearDown(self):
+        try:
+            close_db()
+        except Exception:
+            pass
         self.tmp.cleanup()
 
     def conn(self):
-        return sqlite3.connect(self.path, timeout=5)
+        return helpers.connect()
 
     def test_idempotent_create_and_complete(self):
         c = self.conn()
@@ -170,6 +169,57 @@ class QueueTests(unittest.TestCase):
         for t in threads: t.start()
         for t in threads: t.join()
         self.assertEqual(sum(r is not None for r in results), 1)
+
+    def test_two_workers_different_jobs_same_lead_one_winner(self):
+        """Plan §4.1 (lead lock): two workers claiming *different* jobs for the
+        same lead must never both win — a lead can only have one active call."""
+        c = self.conn()
+        create_job(c, lead_id=1, job_type="interested_followup", priority=3, due_at_utc=1,
+                   eligible_pool="sandbox3_nurture", idempotency_key="fu:1")
+        create_job(c, lead_id=1, job_type="site_visit_reminder_morning", priority=4, due_at_utc=1,
+                   eligible_pool="sandbox3_nurture", idempotency_key="sv:1")
+        promote_due(c, 2); c.close()
+        claimed = []
+        barrier = threading.Barrier(2)
+        def worker(number):
+            conn = self.conn(); barrier.wait()
+            try:
+                r = claim_next(conn, eligible_pool="sandbox3_nurture", number=number, now=2)
+                if r:
+                    claimed.append(r["id"])
+            finally:
+                conn.close()
+        threads = [threading.Thread(target=worker, args=(n,)) for n in ("P7", "P8")]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        self.assertEqual(len(claimed), 1, "exactly one of the two same-lead jobs may be claimed")
+        c = self.conn()
+        try:
+            active = c.execute(
+                "SELECT COUNT(*) FROM workflow_jobs WHERE lead_id=1 AND status IN ('claimed','running')"
+            ).fetchone()[0]
+            self.assertEqual(active, 1, "lead lock: at most one active job per lead")
+        finally:
+            c.close()
+
+    def test_expired_lease_is_recovered_and_reclaimable(self):
+        """Lease recovery: a crashed worker's expired claim is reset to ready."""
+        c = self.conn()
+        job_id = create_job(c, lead_id=1, job_type="callback", priority=1, due_at_utc=1,
+                            eligible_pool="sandbox1_callback", idempotency_key="lease:1")
+        promote_due(c, 2)
+        first = claim_next(c, eligible_pool="sandbox1_callback", number="P1", now=2, lease_seconds=300)
+        self.assertIsNotNone(first)
+        # No other worker can take it while the lease is live.
+        self.assertIsNone(claim_next(c, eligible_pool="sandbox1_callback", number="P2", now=2))
+        # Simulate a crashed worker: lease expires; the next claim recovers it.
+        c.execute("UPDATE workflow_jobs SET lease_expires_at=? WHERE id=?", (1.0, job_id))
+        c.commit()
+        recovered = claim_next(c, eligible_pool="sandbox1_callback", number="P2", now=400)
+        self.assertIsNotNone(recovered)
+        self.assertEqual(recovered["id"], job_id)
+        self.assertEqual(recovered["claimed_by_number"], "P2")
+        c.close()
 
     def test_dispatcher_priority_and_number_connection(self):
         import asyncio
@@ -245,13 +295,102 @@ class QueueTests(unittest.TestCase):
         finally:
             c.close()
 
+    def test_opted_out_lead_aborts_claim_in_every_pool(self):
+        """Plan §4.3 (DND filter): an opted-out lead's jobs must never be
+        claimable — regardless of which sandbox pool they landed in."""
+        c = self.conn()
+        c.execute("INSERT INTO do_not_contact(normalized_phone,lead_id) VALUES('9999999999',1)")
+        c.commit()
+        create_job(c, lead_id=1, job_type="fresh_call", priority=6, due_at_utc=1,
+                   eligible_pool="sandbox1_fresh", idempotency_key="dnc:fresh")
+        create_job(c, lead_id=1, job_type="post_visit_feedback", priority=5, due_at_utc=1,
+                   eligible_pool="sandbox4_feedback", idempotency_key="dnc:fb")
+        promote_due(c, 2)
+        try:
+            self.assertIsNone(claim_next(c, eligible_pool="sandbox1_fresh", number="P1", now=2))
+            self.assertIsNone(claim_next(c, eligible_pool="sandbox4_feedback", number="P9", now=2))
+            statuses = [r[0] for r in c.execute(
+                "SELECT status FROM workflow_jobs WHERE lead_id=1 ORDER BY id"
+            ).fetchall()]
+            self.assertEqual(statuses, ["ready", "ready"], "DNC jobs stay queued, never claimed")
+        finally:
+            c.close()
+
+    def test_mixed_source_callbacks_ring_from_their_own_originating_line(self):
+        """Plan §2/Phase 2 (callback routing): a digital lead's callback must
+        ring from P3 and a cold lead's from P1/P2, resolved from the *claimed*
+        job at claim time."""
+        import asyncio
+        c = self.conn()
+        c.execute("INSERT INTO leads(id,phone,role,source) VALUES(2,'8888888888','sales_1','digital')")
+        c.execute("INSERT INTO leads(id,phone,role,source) VALUES(3,'7777777777','campaign','campaign')")
+        c.commit()
+        create_job(c, lead_id=2, job_type="callback", priority=1, due_at_utc=1,
+                   eligible_pool="sandbox1_callback", idempotency_key="cb:d2")
+        create_job(c, lead_id=3, job_type="callback", priority=1, due_at_utc=1,
+                   eligible_pool="sandbox1_callback", idempotency_key="cb:c3")
+        pools = {
+            NumberPool.SANDBOX1_FRESH: ("COLD",), NumberPool.SANDBOX1_DIGITAL: ("DIG",),
+            NumberPool.SANDBOX1_CALLBACK: ("COLD", "DIG"), NumberPool.SANDBOX2_RETRY_2: ("COLD",),
+            NumberPool.SANDBOX2_RETRY_3_COLD: ("COLD",), NumberPool.SANDBOX2_RETRY_3_DIGITAL: ("DIG",),
+            NumberPool.SANDBOX3_NURTURE: ("COLD", "DIG"), NumberPool.SANDBOX4_FEEDBACK: ("COLD",),
+            NumberPool.WHATSAPP: (),
+        }
+        calls = []
+        async def phone(job, number): calls.append((job["lead_id"], number))
+        async def wa(job, number): pass
+        try:
+            # Job id order → digital lead (id 2's job) is claimed first.
+            asyncio.run(dispatch_once(c, pools=pools, busy_numbers=set(), phone_executor=phone, whatsapp_executor=wa, now=2))
+            self.assertEqual(calls, [(2, "DIG")], "digital callback must ring from P3-equivalent line")
+            asyncio.run(dispatch_once(c, pools=pools, busy_numbers=set(), phone_executor=phone, whatsapp_executor=wa, now=2))
+            self.assertEqual(calls, [(2, "DIG"), (3, "COLD")], "cold callback must ring from P1/P2-equivalent line")
+        finally:
+            c.close()
+
+    def test_callback_retry_keeps_originating_line(self):
+        """Plan §4.5 (callback routing): a no-answer callback retry stays on the
+        originating sandbox line for the lead's source."""
+        import asyncio
+        c = self.conn()
+        c.execute("INSERT INTO leads(id,phone,role,source) VALUES(2,'8888888888','sales_1','digital')")
+        c.commit()
+        from core.orchestration_service import relationship_no_answer
+        create_job(c, lead_id=2, job_type="callback", priority=1, due_at_utc=1,
+                   eligible_pool="sandbox1_callback", idempotency_key="cb:retry1")
+        promote_due(c, 2)
+        job = claim_next(c, eligible_pool="sandbox1_callback", number="DIG", now=2)
+        self.assertIsNotNone(job)
+        complete_job(c, job["id"], job["claim_token"])
+        # Callback failed → one bounded retry, still sandbox1_callback.
+        retry_id = relationship_no_answer(
+            c, job=job, source="sales_1",
+            ended_at=datetime(2026, 8, 4, 16, 0, tzinfo=ZoneInfo("Asia/Kolkata")),
+        )
+        retry = dict(c.execute("SELECT * FROM workflow_jobs WHERE id=?", (retry_id,)).fetchone())
+        self.assertEqual((retry["eligible_pool"], retry["attempt_number"]), ("sandbox1_callback", 2))
+        promote_due(c, retry["due_at_utc"] + 1)
+        calls = []
+        async def phone(job, number): calls.append((job["lead_id"], number))
+        async def wa(job, number): pass
+        pools = {
+            NumberPool.SANDBOX1_FRESH: ("COLD",), NumberPool.SANDBOX1_DIGITAL: ("DIG",),
+            NumberPool.SANDBOX1_CALLBACK: ("COLD", "DIG"), NumberPool.SANDBOX2_RETRY_2: ("COLD",),
+            NumberPool.SANDBOX2_RETRY_3_COLD: ("COLD",), NumberPool.SANDBOX2_RETRY_3_DIGITAL: ("DIG",),
+            NumberPool.SANDBOX3_NURTURE: ("COLD", "DIG"), NumberPool.SANDBOX4_FEEDBACK: ("COLD",),
+            NumberPool.WHATSAPP: (),
+        }
+        asyncio.run(dispatch_once(c, pools=pools, busy_numbers=set(), phone_executor=phone, whatsapp_executor=wa, now=retry["due_at_utc"] + 1))
+        self.assertEqual(calls, [(2, "DIG")], "callback retry must ring from the originating digital line")
+        c.close()
+
 
 class EndToEndFlowTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = init_db(self.tmp.name)
-        self.c = sqlite3.connect(self.db)
-        self.c.row_factory = sqlite3.Row
+        helpers.reset_operational_tables()
+        self.c = helpers.connect()
         cur = self.c.execute(
             "INSERT INTO leads(role,name,phone,lifecycle_status) VALUES('campaign','Test Lead','+91 98765-43210','new')"
         )
@@ -265,7 +404,10 @@ class EndToEndFlowTests(unittest.TestCase):
             close_db()
         except Exception:
             pass
-        self.c.close()
+        try:
+            self.c.close()
+        except Exception:
+            pass
         self.tmp.cleanup()
 
     def jobs(self, job_type=None):
@@ -292,6 +434,49 @@ class EndToEndFlowTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             failed_call(self.c, lead_id=self.lead, source="campaign", retry_cycle="r1",
                         attempt=4, from_number="P5", outcome="no_answer", ended_at=t)
+
+    def test_retry_due_times_follow_working_hours_12_and_24(self):
+        """Plan §4.2 / Phase 3: attempt 2 is +12 working hours, attempt 3 is
+        +24 working hours (11:00–19:30 Asia/Kolkata) — never inside quiet hours."""
+        t = datetime(2026, 8, 3, 11, 0, tzinfo=self.tz)
+        j2 = failed_call(self.c, lead_id=self.lead, source="campaign", retry_cycle="rh1",
+                         attempt=1, from_number="P2", outcome="no_answer", ended_at=t)
+        due2 = datetime.fromtimestamp(
+            self.c.execute("SELECT due_at_utc FROM workflow_jobs WHERE id=?", (j2,)).fetchone()[0],
+            timezone.utc,
+        ).astimezone(self.tz)
+        self.assertEqual(due2, datetime(2026, 8, 4, 14, 30, tzinfo=self.tz), "attempt 2 = +12 working hours")
+        j3 = failed_call(self.c, lead_id=self.lead, source="campaign", retry_cycle="rh1",
+                         attempt=2, from_number="P4", outcome="busy", ended_at=due2)
+        due3 = datetime.fromtimestamp(
+            self.c.execute("SELECT due_at_utc FROM workflow_jobs WHERE id=?", (j3,)).fetchone()[0],
+            timezone.utc,
+        ).astimezone(self.tz)
+        self.assertEqual(due3, datetime(2026, 8, 7, 13, 0, tzinfo=self.tz), "attempt 3 = +24 working hours")
+        for due in (due2, due3):
+            self.assertGreaterEqual(due.time(), time(11, 0))
+            self.assertLess(due.time(), time(19, 30))
+
+    def test_working_hours_boundary_715pm_slides_after_11am(self):
+        """Plan §4.2 (verbatim): a retry scheduled at 7:15 PM automatically
+        slides its due time into the next working day after 11:00 AM."""
+        # Relative schedule ("in N working hours") from 7:15 PM must land after
+        # 11:00 AM of a later working day, never inside quiet hours.
+        late = datetime(2026, 8, 3, 19, 15, tzinfo=self.tz)
+        slid = add_working_hours(late, 1)
+        self.assertEqual(slid, datetime(2026, 8, 4, 11, 45, tzinfo=self.tz),
+                         "1 working hour from 19:15 slides to next day 11:45")
+        # The 12-working-hour retry from a 7:15 PM failure also lands inside the
+        # window, strictly after the next day's 11:00 AM.
+        j2 = failed_call(self.c, lead_id=self.lead, source="campaign", retry_cycle="r715",
+                         attempt=1, from_number="P2", outcome="no_answer", ended_at=late)
+        due2 = datetime.fromtimestamp(
+            self.c.execute("SELECT due_at_utc FROM workflow_jobs WHERE id=?", (j2,)).fetchone()[0],
+            timezone.utc,
+        ).astimezone(self.tz)
+        self.assertEqual(due2, datetime(2026, 8, 5, 14, 15, tzinfo=self.tz))
+        self.assertGreaterEqual(due2.time(), time(11, 0))
+        self.assertLess(due2.time(), time(19, 30))
 
     def test_digital_retry_uses_attempt_pools(self):
         t = datetime(2026, 8, 3, 12, 0, tzinfo=self.tz)

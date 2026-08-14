@@ -176,7 +176,9 @@ def get_report_data(from_date=None, to_date=None, role=None, include_transcripts
         if phone in car_phones: return "New Luxury Car Data"
         
         try:
-            ex = json.loads(lead.get("extra") or "{}")
+            ex = json.loads(lead.get("extra")) if isinstance(lead.get("extra"), (str, bytes, bytearray)) else (lead.get("extra") or {})
+            if not isinstance(ex, dict):
+                ex = {}
             source = ex.get("upload_source") or ex.get("Source File Name") or ex.get("source")
             if source:
                 cleaned = clean_source_name(str(source))
