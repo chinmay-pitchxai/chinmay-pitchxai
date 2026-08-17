@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import helpers  # noqa: E402  (Postgres test DB + reset)
 
 from core.storage import close_db, init_db
-from services.digital_excel_ingest import ingest_digital_file, read_digital_rows
+from services.digital_excel_ingest import ingest_digital_file, ingest_digital_rows, read_digital_rows
 
 
 class DigitalExcelIngestTests(unittest.TestCase):
@@ -57,6 +57,40 @@ class DigitalExcelIngestTests(unittest.TestCase):
             conn.close()
         self.assertEqual(lead_count, 2)
         self.assertEqual([tuple(j) for j in jobs], [("sandbox1_digital", 1), ("sandbox1_digital", 1)])
+
+    def test_broker_rows_queue_only_new_phones_in_sandbox_1_2(self):
+        rows = [
+            {"name": "Asha", "phone": "9876543210", "row_id": "11:2"},
+            {"name": "Asha duplicate", "phone": "9876543210", "row_id": "11:3"},
+            {"name": "Bad", "phone": "", "row_id": "11:4"},
+        ]
+        first = ingest_digital_rows(rows, broker_id="broker_1")
+        second = ingest_digital_rows(rows, broker_id="broker_1")
+
+        self.assertEqual(first["saved"], 1)
+        self.assertEqual(first["queued"], 1)
+        self.assertEqual(first["duplicates"], 1)
+        self.assertEqual(len(first["rejected"]), 1)
+        self.assertEqual(
+            [result["status"] for result in first["results"]],
+            ["queued", "duplicate", "rejected"],
+        )
+        self.assertEqual(second["saved"], 0)
+        self.assertEqual(second["queued"], 0)
+        self.assertEqual(second["duplicates"], 2)
+
+        conn = helpers.connect()
+        try:
+            job = conn.execute(
+                "SELECT eligible_pool,attempt_number,source_type,payload_json "
+                "FROM workflow_jobs"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(job["eligible_pool"], "sandbox1_digital")
+        self.assertEqual(job["attempt_number"], 1)
+        self.assertEqual(job["source_type"], "google_sheets")
+        self.assertIn('"sub_sandbox": "1.2"', job["payload_json"])
 
 
 if __name__ == "__main__":

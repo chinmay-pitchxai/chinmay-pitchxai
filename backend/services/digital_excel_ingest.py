@@ -85,8 +85,13 @@ def ingest_digital_file(path: Path, *, role: str, sheet_name: str = "") -> dict:
 
     role = normalize_console_role(role)
     leads = read_digital_rows(path, sheet_name)
-    saved, duplicates, dnc_blocked = _bulk_add_leads_sync(role, leads)
     conn = _get_conn()
+    existing_before = {
+        str(row[0]) for row in conn.execute(
+            "SELECT phone FROM leads WHERE role=?", (role,)
+        ).fetchall()
+    }
+    saved, duplicates, dnc_blocked = _bulk_add_leads_sync(role, leads)
     queued = 0
     from core.orchestration_service import schedule_job
     from core.workflow_models import JobType
@@ -94,6 +99,8 @@ def ingest_digital_file(path: Path, *, role: str, sheet_name: str = "") -> dict:
     feed_id = hashlib.sha256(str(path.resolve()).encode("utf-8")).hexdigest()[:16]
     now = datetime.now(timezone.utc)
     for lead in leads:
+        if lead["phone"] in existing_before:
+            continue
         row = conn.execute(
             "SELECT id FROM leads WHERE role=? AND phone=? ORDER BY id DESC LIMIT 1",
             (role, lead["phone"]),
@@ -123,33 +130,80 @@ def ingest_digital_file(path: Path, *, role: str, sheet_name: str = "") -> dict:
 
 def ingest_digital_rows(rows: list[dict], *, broker_id: str) -> dict:
     """Normalize Google Sheet rows and reuse the same idempotent P3 queue."""
+    if broker_id not in {"broker_1", "broker_2", "broker_3"}:
+        raise ValueError("broker_id must be broker_1, broker_2, or broker_3")
     from core.orchestration_service import schedule_job
     from core.workflow_models import JobType
     leads = []
-    for item in rows:
+    rejected = []
+    row_results = []
+    batch_phones: set[str] = set()
+    batch_duplicates = 0
+    for index, item in enumerate(rows, start=1):
         phone = norm_phone_str(str(item.get("phone") or ""))
+        row_id = str(item.get("row_id") or "")
         if not phone:
+            result = {"index": index, "row_id": row_id, "status": "rejected",
+                      "reason": "missing_or_invalid_phone"}
+            rejected.append(result)
+            row_results.append(result)
             continue
+        if phone in batch_phones:
+            batch_duplicates += 1
+            row_results.append({"index": index, "row_id": row_id, "status": "duplicate"})
+            continue
+        batch_phones.add(phone)
         leads.append({"name": str(item.get("name") or "Unknown"), "phone": phone,
                       "email": str(item.get("email") or ""), "details": str(item.get("notes") or ""),
                       "source": "digital", "sandbox": 1,
-                      "extra": {"broker_id": broker_id, "sub_sandbox": "1.2"}})
+                      "extra": {"broker_id": broker_id, "sub_sandbox": "1.2",
+                                "broker_source": str(item.get("source") or ""),
+                                "sheet_row_id": row_id},
+                      "_ingest_index": index, "_row_id": row_id})
     role = "sales_1"
+    conn = _get_conn()
+    existing_before = {
+        str(row[0]) for row in conn.execute(
+            "SELECT phone FROM leads WHERE role=?", (role,)
+        ).fetchall()
+    }
     saved, duplicates, dnc_blocked = _bulk_add_leads_sync(role, leads)
-    conn = _get_conn(); queued = 0
+    queued = 0
     for lead in leads:
+        if lead["phone"] in existing_before:
+            row_results.append({"index": lead["_ingest_index"], "row_id": lead["_row_id"],
+                                "status": "duplicate"})
+            continue
         row = conn.execute("SELECT id FROM leads WHERE role=? AND phone=? ORDER BY id DESC LIMIT 1", (role, lead["phone"])).fetchone()
-        if not row: continue
+        if not row:
+            row_results.append({"index": lead["_ingest_index"], "row_id": lead["_row_id"],
+                                "status": "dnc_blocked"})
+            continue
         try:
-            schedule_job(conn, lead_id=int(row[0]), job_type=JobType.FRESH_CALL,
-                         source="digital", due_at=datetime.now(timezone.utc),
-                         key=f"google-sheet:{broker_id}:{int(row[0])}", attempt=1,
-                         source_type="google_sheets", source_id=broker_id,
-                         payload={"broker_id": broker_id, "sub_sandbox": "1.2"})
+            schedule_job(
+                conn, lead_id=int(row[0]), job_type=JobType.FRESH_CALL,
+                source="digital", due_at=datetime.now(timezone.utc),
+                key=f"google-sheet:{broker_id}:{int(row[0])}", attempt=1,
+                source_type="google_sheets", source_id=broker_id,
+                payload={"broker_id": broker_id, "sub_sandbox": "1.2"},
+            )
             queued += 1
+            row_results.append({
+                "index": lead["_ingest_index"], "row_id": lead["_row_id"],
+                "status": "queued",
+            })
         except Exception as exc:
+            row_results.append({"index": lead["_ingest_index"], "row_id": lead["_row_id"],
+                                "status": "rejected", "reason": "queue_failed"})
             if "UNIQUE" not in str(exc).upper(): logger.warning("Sheet queue failed: {}", exc)
-    return {"rows": len(rows), "saved": saved, "duplicates": duplicates, "dnc_blocked": dnc_blocked, "queued": queued}
+    return {
+        "rows": len(rows), "accepted": len(leads), "saved": saved,
+        "duplicates": duplicates + batch_duplicates,
+        "dnc_blocked": dnc_blocked, "queued": queued,
+        "rejected": rejected, "broker_id": broker_id,
+        "sub_sandbox": "1.2", "phone_line": "P3",
+        "results": sorted(row_results, key=lambda item: item["index"]),
+    }
 
 
 async def digital_excel_watcher() -> None:
