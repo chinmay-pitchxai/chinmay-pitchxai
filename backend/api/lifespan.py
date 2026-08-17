@@ -40,9 +40,11 @@ async def lifespan(app: FastAPI):
     init_db(data_dir)
     # Fail startup before any worker can dial when the operational catalog is
     # empty, has duplicate P-lines, or leaves a workflow job without an owner.
-    from core.sandbox_catalog import load_sandbox_catalog
+    from core.sandbox_catalog import load_sandbox_catalog, sync_catalog_agents
     sandbox_catalog = load_sandbox_catalog()
     logger.info("Validated {} production sandbox definitions (P1-P9)", len(sandbox_catalog))
+    synced_agents = sync_catalog_agents()
+    logger.info("Synchronized {} managed sandbox agents into the application database", synced_agents)
     from core.storage import cleanup_orphaned_operational_rows
     orphan_cleanup = cleanup_orphaned_operational_rows()
     if any(orphan_cleanup.values()):

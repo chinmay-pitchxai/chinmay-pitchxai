@@ -86,3 +86,38 @@ def prompt_overlay_for_job(job_type: str) -> str:
 def public_sandbox_catalog() -> list[dict[str, Any]]:
     """Return a detached JSON-safe catalog for APIs and dashboards."""
     return json.loads(json.dumps(load_sandbox_catalog()))
+
+
+def sync_catalog_agents(conn=None) -> int:
+    """Upsert the four managed sandbox agents into the application database.
+
+    The Sandbox/Agent Factory UI reads the ``agents`` table, not the JSON file.
+    Deterministic catalog IDs make this safe and idempotent on every startup;
+    custom user-created agents are never modified.
+    """
+    if conn is None:
+        from core.storage import _get_conn
+
+        conn = _get_conn()
+    synced = 0
+    for agent in load_sandbox_catalog():
+        conn.execute(
+            """INSERT INTO agents(id,role,name,prompt,voice)
+            VALUES(?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+              role=excluded.role,
+              name=excluded.name,
+              prompt=excluded.prompt,
+              voice=excluded.voice,
+              updated_at=datetime('now')""",
+            (
+                str(agent["id"]),
+                str(agent.get("role") or "sales_1"),
+                str(agent["name"]),
+                str(agent["prompt"]),
+                str(agent.get("voice") or "Puck"),
+            ),
+        )
+        synced += 1
+    conn.commit()
+    return synced

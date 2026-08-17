@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import sqlite3
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.business_hours import is_within_working_hours, next_working_time
 from core.number_allocator import DEFAULT_POOLS
-from core.sandbox_catalog import load_sandbox_catalog, sandbox_for_job
+from core.sandbox_catalog import load_sandbox_catalog, sandbox_for_job, sync_catalog_agents
 from core.workflow_models import JobType, NumberPool
 
 
@@ -47,6 +48,26 @@ class SandboxCatalogTests(unittest.TestCase):
         )
         self.assertEqual(set(DEFAULT_POOLS[NumberPool.SANDBOX3_NURTURE]), catalog_lines[3])
         self.assertEqual(set(DEFAULT_POOLS[NumberPool.SANDBOX4_FEEDBACK]), catalog_lines[4])
+
+    def test_catalog_agents_are_idempotently_synced_for_the_ui(self):
+        conn = sqlite3.connect(":memory:")
+        try:
+            conn.execute(
+                """CREATE TABLE agents(
+                id TEXT PRIMARY KEY, role TEXT, name TEXT, prompt TEXT, voice TEXT,
+                updated_at TEXT
+                )"""
+            )
+            self.assertEqual(sync_catalog_agents(conn), 4)
+            self.assertEqual(sync_catalog_agents(conn), 4)
+            rows = conn.execute(
+                "SELECT id,role,name FROM agents ORDER BY id"
+            ).fetchall()
+            self.assertEqual(len(rows), 4)
+            self.assertTrue(all(row[1] == "sales_1" for row in rows))
+            self.assertEqual(rows[0][0], "sandbox-1-initial-outreach")
+        finally:
+            conn.close()
 
 
 class WorkingWindowTests(unittest.TestCase):
