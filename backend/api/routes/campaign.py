@@ -68,6 +68,29 @@ class DigitalLeadWebhookPayload(BaseModel):
     rows: list[DigitalLeadWebhookRow] = Field(min_length=1, max_length=500)
 
 
+async def _ensure_digital_p3_dispatcher() -> dict:
+    """Start only the P3-aware orchestrator; never fall back to cold dialing."""
+    if settings.webhook_only_mode:
+        return {"auto_started": False, "blocked": "webhook_only_mode"}
+    from core.orchestration_runtime import ensure_orchestration_running, runtime_status
+
+    status = runtime_status()
+    if status["mode"] != "live":
+        return {
+            "auto_started": False,
+            "blocked": "p3_orchestration_not_live",
+            "configuration_errors": status["configuration_errors"],
+        }
+    respawned, detail = await ensure_orchestration_running()
+    return {
+        "auto_started": True,
+        "engine": "orchestration",
+        "phone_line": "P3",
+        "respawned": respawned,
+        "detail": detail,
+    }
+
+
 @router.post("/digital-leads/webhook")
 async def digital_leads_webhook(payload: DigitalLeadWebhookPayload, request: Request):
     """Receive broker Sheet rows, deduplicate them, and queue P3 calls immediately."""
@@ -76,69 +99,19 @@ async def digital_leads_webhook(payload: DigitalLeadWebhookPayload, request: Req
     if not configured_secret or not secrets.compare_digest(supplied_secret, configured_secret):
         raise HTTPException(status_code=401, detail="Invalid digital-leads webhook secret")
 
-    from core.orchestration_service import schedule_job
-    from core.storage import _bulk_add_leads_sync, _get_conn
-    from core.workflow_models import JobType
+    from services.digital_excel_ingest import ingest_digital_rows
 
-    normalized = []
-    rejected = []
-    for index, row in enumerate(payload.rows, start=1):
-        phone = _norm_phone_str(row.phone)
-        if not phone:
-            rejected.append({"index": index, "row_id": row.row_id, "reason": "missing_or_invalid_phone"})
-            continue
-        normalized.append({
-            "name": row.name.strip() or "Unknown",
-            "phone": phone,
-            "email": row.email.strip(),
-            "details": row.notes.strip(),
-            "source": "digital",
-            "sandbox": 1,
-            "extra": {
-                "broker_id": payload.broker_id,
-                "broker_source": row.source.strip(),
-                "sheet_row_id": row.row_id.strip(),
-                "sub_sandbox": "1.2",
-            },
-        })
-
-    role = "sales_1"
-    saved, duplicates, dnc_blocked = await asyncio.to_thread(_bulk_add_leads_sync, role, normalized)
-    conn = _get_conn()
-    queued = 0
-    for lead in normalized:
-        row = conn.execute(
-            "SELECT id FROM leads WHERE role=? AND phone=? ORDER BY id DESC LIMIT 1",
-            (role, lead["phone"]),
-        ).fetchone()
-        if not row:
-            continue
-        lead_id = int(row[0])
-        try:
-            schedule_job(
-                conn,
-                lead_id=lead_id,
-                job_type=JobType.FRESH_CALL,
-                source="digital",
-                due_at=datetime.datetime.now(timezone.utc),
-                key=f"google-sheet:{payload.broker_id}:{lead_id}",
-                attempt=1,
-                source_type="google_sheets",
-                source_id=payload.broker_id,
-                payload={"broker_id": payload.broker_id, "sub_sandbox": "1.2"},
-            )
-            queued += 1
-        except Exception as exc:
-            if "UNIQUE" not in str(exc).upper():
-                logger.warning("Google Sheet row queue failed lead={} error={}", lead_id, exc)
-
-    worker = await _try_start_campaign_worker(role) if queued else {"auto_started": False}
-    return {
-        "accepted": len(normalized), "saved": saved, "queued": queued,
-        "duplicates": duplicates, "dnc_blocked": dnc_blocked,
-        "rejected": rejected, "broker_id": payload.broker_id,
-        "sub_sandbox": "1.2", "phone_line": "P3", "worker": worker,
-    }
+    result = await asyncio.to_thread(
+        ingest_digital_rows,
+        [row.model_dump() for row in payload.rows],
+        broker_id=payload.broker_id,
+    )
+    result["worker"] = await _ensure_digital_p3_dispatcher() if result["queued"] else {"auto_started": False}
+    if result["queued"] and not result["worker"].get("auto_started"):
+        for row_result in result["results"]:
+            if row_result["status"] == "queued":
+                row_result["status"] = "queued_waiting_for_dialer"
+    return result
 
 
 @router.get("/digital-feed-status")
@@ -150,6 +123,16 @@ async def digital_feed_status():
         {"broker_id": "broker_2", "url": settings.digital_broker_2_sheet_url},
         {"broker_id": "broker_3", "url": settings.digital_broker_3_sheet_url},
     ]
+    from core.orchestration_runtime import runtime_status
+
+    orchestration = runtime_status()
+    blockers = []
+    if not settings.digital_leads_webhook_secret:
+        blockers.append("DIGITAL_LEADS_WEBHOOK_SECRET is not configured")
+    if settings.webhook_only_mode:
+        blockers.append("WEBHOOK_ONLY_MODE disables outbound dialing on this host")
+    if orchestration["mode"] != "live":
+        blockers.extend(orchestration["configuration_errors"] or ["ORCHESTRATION_LIVE_ENABLED is false"])
     return {
         "enabled": bool(configured_path),
         "path": str(configured_path) if configured_path else "",
@@ -162,6 +145,9 @@ async def digital_feed_status():
         "eligible_pool": "sandbox1_digital",
         "phone_lines": ["P3"],
         "webhook_configured": bool(settings.digital_leads_webhook_secret),
+        "realtime_ready": not blockers,
+        "realtime_blockers": blockers,
+        "orchestration_mode": orchestration["mode"],
         "broker_sheets": broker_sheets,
         "connected_brokers": sum(bool(item["url"]) for item in broker_sheets),
     }
@@ -2276,7 +2262,5 @@ async def merge_contacts_to_leads(request: Request):
             skipped += 1
     conn.commit()
     return {"status": "ok", "merged": merged, "skipped": skipped, "total": len(contacts)}
-
-
 
 

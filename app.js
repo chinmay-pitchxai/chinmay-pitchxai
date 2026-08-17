@@ -1593,12 +1593,13 @@
             const res = await fetch(window.apiBase + '/api/campaign/digital-feed-status', {cache:'no-store'});
             if (!res.ok) throw new Error('Backend unavailable');
             const data = await res.json();
-            status.textContent = data.webhook_configured
-                ? `${data.connected_brokers}/3 Sheets connected · P3`
-                : 'Webhook not configured';
-            status.className = data.connected_brokers === 3
+            status.textContent = data.realtime_ready
+                ? `${data.connected_brokers}/3 Sheets connected · P3 live`
+                : ((data.realtime_blockers || [])[0] || 'Digital lead automation not ready');
+            status.title = (data.realtime_blockers || []).join('\n');
+            status.className = data.realtime_ready && data.connected_brokers === 3
                 ? 'text-xs font-semibold text-tertiary'
-                : 'text-xs font-semibold text-on-surface-variant';
+                : 'text-xs font-semibold text-error';
             (data.broker_sheets || []).forEach((broker, index) => {
                 const el = document.getElementById(`broker-${index + 1}-status`);
                 const card = document.querySelector(`[data-broker-card="${index + 1}"]`);
