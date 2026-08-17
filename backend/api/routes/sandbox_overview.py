@@ -228,6 +228,9 @@ async def sandbox_list():
     from core.state import _CAMPAIGN_TASKS
     from core.storage import get_lead_counts
 
+    from core.sandbox_catalog import public_sandbox_catalog
+
+    catalog = {entry["sandbox"]: entry for entry in public_sandbox_catalog()}
     sandboxes = []
     all_roles = list_sandbox_roles()
     for role in all_roles:
@@ -237,21 +240,62 @@ async def sandbox_list():
                 _CAMPAIGN_TASKS.get(role)
                 and not _CAMPAIGN_TASKS[role].done()
             )
+            definition = get_sandbox_config(role) or {}
+            number = int(role.split("_")[1]) if role.startswith("sandbox_") else 0
+            agent = catalog.get(number, {})
             sandboxes.append(
                 {
                     "role": role,
                     "display_name": sandbox_display_name(role),
                     "total_leads": int(counts.get("total") or 0),
                     "active_campaign": is_active,
+                    "sandbox": number,
+                    "purpose": definition.get("purpose", ""),
+                    "phone_lines": list(definition.get("phones", ())),
+                    "job_types": list(definition.get("job_types", ())),
+                    "agent": {"id": agent.get("id"), "name": agent.get("name"), "voice": agent.get("voice")},
                 }
             )
         except Exception:
+            definition = get_sandbox_config(role) or {}
+            number = int(role.split("_")[1]) if role.startswith("sandbox_") else 0
+            agent = catalog.get(number, {})
             sandboxes.append(
                 {
                     "role": role,
                     "display_name": sandbox_display_name(role),
                     "total_leads": 0,
                     "active_campaign": False,
+                    "sandbox": number,
+                    "purpose": definition.get("purpose", ""),
+                    "phone_lines": list(definition.get("phones", ())),
+                    "job_types": list(definition.get("job_types", ())),
+                    "agent": {"id": agent.get("id"), "name": agent.get("name"), "voice": agent.get("voice")},
                 }
             )
     return {"sandboxes": sandboxes}
+
+
+@router.get("/flow")
+async def sandbox_flow():
+    """Return the authoritative production topology used by the dispatcher."""
+    from core.sandbox_catalog import public_sandbox_catalog
+
+    return {
+        "version": 1,
+        "timezone": settings.orchestration_business_tz or "Asia/Kolkata",
+        "business_hours": {
+            "start": settings.orchestration_work_start,
+            "end": settings.orchestration_work_end,
+        },
+        "sandboxes": public_sandbox_catalog(),
+        "transitions": [
+            {"from": 1, "outcome": "failed", "to": 2},
+            {"from": 1, "outcome": "interested", "to": 3},
+            {"from": 1, "outcome": "site_visit", "to": 3},
+            {"from": 2, "outcome": "interested", "to": 3},
+            {"from": 2, "outcome": "site_visit", "to": 3},
+            {"from": 3, "outcome": "site_visit_completed", "to": 4},
+        ],
+        "terminal_outcomes": ["booked", "not_interested", "lost", "opted_out", "dead"],
+    }

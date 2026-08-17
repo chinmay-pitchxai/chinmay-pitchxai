@@ -2789,6 +2789,19 @@ async def handle_vobiz_ws_live(
                     role,
                 )
 
+            # The shared role prompt defines the sales persona; this overlay
+            # makes a retry, nurture call, reminder, or feedback call behave as
+            # that exact pipeline leg rather than restarting the cold pitch.
+            _sandbox_overlay = (data.get("_orchestration_prompt_overlay") or "").strip()
+            if _sandbox_overlay:
+                system_prompt += "\n\n" + _sandbox_overlay
+                logger.info(
+                    "Sandbox {} prompt overlay appended ({} chars, job_type={})",
+                    data.get("_orchestration_sandbox"),
+                    len(_sandbox_overlay),
+                    (data.get("_orchestration_job") or {}).get("job_type"),
+                )
+
             if _authoritative_lead_name:
                 system_prompt = _personalize_prompt_for_active_call(
                     system_prompt,

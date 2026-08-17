@@ -6,11 +6,13 @@ import inspect
 import sqlite3
 import threading
 import time
+from datetime import datetime, timezone
 from collections.abc import Awaitable, Callable
 
 from core.number_allocator import allocate_number, relationship_number_for_source
 from core.workflow_models import NumberPool
 from core.workflow_queue import claim_next, complete_job, fail_job, promote_due
+from core.business_hours import is_within_working_hours
 
 Executor = Callable[[dict, str | None], Awaitable[None] | None]
 
@@ -100,6 +102,13 @@ async def dispatch_once(
     ).fetchall()
     for pool_name, _priority, _due in candidates:
         pool = NumberPool(pool_name)
+        # Absolute buyer-requested callbacks remain exact. All automated calls
+        # and WhatsApp jobs wait for the 11:00-19:30 Asia/Kolkata window, even
+        # for old queue rows created before schedule-time clamping existed.
+        if pool != NumberPool.SANDBOX1_CALLBACK and not is_within_working_hours(
+            datetime.fromtimestamp(now, timezone.utc)
+        ):
+            continue
         if pool == NumberPool.WHATSAPP:
             number = None
             executor = whatsapp_executor

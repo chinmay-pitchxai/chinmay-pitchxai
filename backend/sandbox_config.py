@@ -19,7 +19,7 @@ OPERATIONAL_SANDBOXES: dict[str, dict[str, Any]] = {
         "display_name": "Sandbox 1 · Initial Outreach",
         "phones": ["P1", "P2", "P3"],
         "purpose": "Fresh cold and digital lead qualification",
-        "job_types": ("fresh_call",),
+        "job_types": ("fresh_call", "callback"),
     },
     "sandbox_2_retry": {
         "display_name": "Sandbox 2 · Failed-Call Retry",
@@ -32,7 +32,7 @@ OPERATIONAL_SANDBOXES: dict[str, dict[str, Any]] = {
         "phones": ["P7", "P8"],
         "purpose": "Interested-lead nurture, callbacks and visit reminders",
         "job_types": (
-            "callback", "interested_followup", "site_visit_reminder_day_before",
+            "interested_followup", "site_visit_reminder_day_before",
             "site_visit_reminder_morning", "site_visit_reschedule",
             "whatsapp_package", "whatsapp_followup_24h",
         ),

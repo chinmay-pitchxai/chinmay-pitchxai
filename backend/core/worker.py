@@ -781,6 +781,29 @@ async def _process_single_lead(
         "_outbound_phone": from_number,
     }
 
+    # Give every autonomous leg its own operational instructions while keeping
+    # the shared sales_1 master prompt as the persona and compliance baseline.
+    # The deploy-time catalog is validated at startup and maps every JobType to
+    # exactly one of the four sandboxes.
+    if orchestration_job:
+        try:
+            from core.sandbox_catalog import prompt_overlay_for_job, sandbox_for_job
+
+            _job_type = str(orchestration_job.get("job_type") or "")
+            _sandbox = sandbox_for_job(_job_type)
+            _CAMPAIGN_DATA[call_id]["_orchestration_job"] = dict(orchestration_job)
+            _CAMPAIGN_DATA[call_id]["_orchestration_sandbox"] = int(_sandbox["sandbox"])
+            _CAMPAIGN_DATA[call_id]["_orchestration_prompt_overlay"] = prompt_overlay_for_job(_job_type)
+        except Exception as _catalog_exc:
+            logger.error(
+                "Unsafe orchestration job configuration job_type={!r}: {}",
+                (orchestration_job or {}).get("job_type"),
+                _catalog_exc,
+            )
+            await update_lead_status(lead_id, "pending", error="Invalid sandbox job configuration")
+            _CAMPAIGN_DATA.pop(call_id, None)
+            raise
+
     # Memory bridge: attach stored lead memory so the live session continues the
     # conversation instead of starting cold (frozen read-only facts).
     try:
@@ -2454,6 +2477,31 @@ async def _analyze_and_update_lead(
     # nurture, feedback) can continue the conversation instead of starting cold.
     _persist_lead_memory(lead_id, analysis, canon_disp=canon_disp)
 
+    # In live autonomous mode, analysis must drive the queue/state machine — a
+    # dashboard-only status update would otherwise leave callbacks and nurture
+    # work in the legacy scheduler. The bridge is idempotent by transcript id.
+    try:
+        from core.orchestration_runtime import runtime_status as _orch_runtime_status
+
+        if _orch_runtime_status()["mode"] == "live":
+            from datetime import datetime as _orch_datetime, timezone as _orch_timezone
+            from core.orchestration_service import reconcile_analyzed_outcome
+            from core.storage import _get_conn as _orch_conn
+
+            _lead_source_row = _orch_conn().execute(
+                "SELECT source FROM leads WHERE id=?", (lead_id,)
+            ).fetchone()
+            _lead_source = str(
+                (_lead_source_row[0] if _lead_source_row else "") or "campaign"
+            )
+            reconcile_analyzed_outcome(
+                _orch_conn(), lead_id=lead_id, source=_lead_source,
+                analysis=analysis, interaction_id=log_id or resolved_camp or str(lead_id),
+                occurred_at=_orch_datetime.now(_orch_timezone.utc),
+            )
+    except Exception:
+        logger.exception("Autonomous outcome reconciliation failed for lead {}", lead_id)
+
     # Record this call attempt so the dashboard can show historical retakes.
     try:
         from core.storage import add_call_attempt, get_lead as _ca_get_lead
@@ -2517,7 +2565,8 @@ async def _analyze_and_update_lead(
     )
 
     # ── Reschedule Voicemail / Analyzed Failures ─────────────────
-    if new_status in ("failed", "no answer", "busy"):
+    from core.orchestration_runtime import runtime_status as _retry_runtime_status
+    if new_status in ("failed", "no answer", "busy") and _retry_runtime_status()["mode"] != "live":
         try:
             from core.storage import get_lead
             lead_row = await get_lead(role, lead_id)
@@ -2535,7 +2584,10 @@ async def _analyze_and_update_lead(
         except Exception as retry_ex:
             logger.exception("Failed to schedule retry for voicemail/failed lead {}: {}", lead_id, retry_ex)
 
-    if new_status == "callback_scheduled" and is_cb and rem_f is not None:
+    if (
+        new_status == "callback_scheduled" and is_cb and rem_f is not None
+        and _retry_runtime_status()["mode"] != "live"
+    ):
         try:
             from core.storage import add_scheduled_callback, get_lead as _get_lead_for_cb
             _lead_row = await _get_lead_for_cb(role, lead_id)

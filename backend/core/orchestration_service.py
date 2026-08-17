@@ -7,7 +7,7 @@ import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-from core.business_hours import add_working_hours
+from core.business_hours import add_working_hours, next_working_time
 from core.number_allocator import pool_for
 from core.workflow_models import JobType, LeadStage, TERMINAL_STAGES, require_transition
 from core.workflow_queue import cancel_lead_jobs, create_job
@@ -65,7 +65,30 @@ def schedule_job(conn, *, lead_id: int, job_type: JobType, source: str,
     lead = _lead(conn, lead_id)
     if conn.execute("SELECT 1 FROM do_not_contact WHERE normalized_phone=?", (_phone(lead["phone"]),)).fetchone():
         raise PermissionError("Lead is opted out")
+    # Optional fail-closed consent gate used in regulated deployments. This is
+    # checked at queue creation as well as campaign start so MCP/manual/digital
+    # ingestion cannot bypass the operator's TRAI consent confirmation.
+    try:
+        from config import settings
+        enforce_consent = bool(settings.orchestration_enforce_consent)
+    except Exception:
+        enforce_consent = False
+    if enforce_consent:
+        try:
+            from core.state import get_campaign_config
+            role = str(lead["role"] or "sales_1")
+            if not bool((get_campaign_config(role) or {}).get("consent_confirmed")):
+                raise PermissionError("Outbound consent has not been confirmed for this campaign")
+        except PermissionError:
+            raise
+        except Exception as exc:
+            raise PermissionError("Outbound consent could not be verified") from exc
     pool = pool_for(job_type, source, attempt)
+    # User-requested callbacks are an explicit-time contract. Every other
+    # automated touch is constrained to the configured TRAI-safe calling
+    # window, including immediately enqueued fresh leads and 09:00 reminders.
+    if job_type != JobType.CALLBACK:
+        due_at = next_working_time(due_at)
     return create_job(
         conn, lead_id=lead_id, job_type=job_type.value,
         priority=PRIORITY[job_type], due_at_utc=due_at.astimezone(timezone.utc).timestamp(),
@@ -135,7 +158,7 @@ def _get_max_retries_for_role(role: str) -> int:
 def schedule_callback(conn, *, lead_id: int, source: str, due_at: datetime, reason: str) -> int:
     conn.execute(
         "UPDATE workflow_jobs SET status='cancelled',error='callback rescheduled' "
-        "WHERE lead_id=? AND job_type='callback' AND status IN ('scheduled','ready','claimed')",
+        "WHERE lead_id=? AND job_type='callback' AND status IN ('scheduled','ready')",
         (lead_id,),
     )
     conn.execute("UPDATE leads SET lifecycle_status='callback_requested' WHERE id=?", (lead_id,)); conn.commit()
@@ -335,3 +358,133 @@ def update_memory(conn: sqlite3.Connection, lead_id: int, facts: dict, summary: 
     )
     conn.commit()
     return version
+
+
+def reconcile_analyzed_outcome(
+    conn: sqlite3.Connection, *, lead_id: int, source: str, analysis: dict,
+    interaction_id: str, occurred_at: datetime | None = None,
+) -> dict[str, int | str | None]:
+    """Translate a completed voice analysis into the autonomous state machine.
+
+    The legacy transcript analyzer remains the source of the disposition. This
+    function is the production bridge that makes that outcome create/cancel
+    workflow-queue jobs, so changing a dashboard status alone cannot strand a
+    lead between sandboxes. Calls are idempotent per ``interaction_id``.
+    """
+    now = occurred_at or datetime.now(timezone.utc)
+    disposition = str(analysis.get("disposition") or "").strip().lower().replace("_", " ")
+    next_action = analysis.get("next_action") or {}
+    if not isinstance(next_action, dict):
+        next_action = {}
+    action = str(next_action.get("action_type") or "").strip().lower().replace("_", " ")
+    cycle = re.sub(r"[^A-Za-z0-9_.:-]+", "-", interaction_id or f"lead-{lead_id}")[:160]
+
+    facts = {
+        "budget": analysis.get("preferred_budget") or analysis.get("budget"),
+        "preferred_location": analysis.get("preferred_location"),
+        "property_type": analysis.get("property_type") or analysis.get("preferred_unit"),
+        "timeline": analysis.get("timeline"),
+        "last_disposition": analysis.get("disposition"),
+        "callback_requested_at": analysis.get("requested_callback_datetime_iso"),
+        "site_visit_datetime_iso": analysis.get("site_visit_datetime_iso"),
+    }
+    update_memory(conn, lead_id, facts, str(analysis.get("summary") or ""), now)
+
+    def cancel_waiting(reason: str) -> None:
+        conn.execute(
+            "UPDATE workflow_jobs SET status='cancelled',error=?,updated_at=datetime('now') "
+            "WHERE lead_id=? AND status IN ('scheduled','ready')",
+            (reason, lead_id),
+        )
+        conn.commit()
+
+    if disposition in {"opted out", "opt out", "dnc", "do not call"}:
+        opt_out(conn, lead_id, "Explicit opt-out in analyzed call", cycle)
+        return {"outcome": "opted_out", "job_id": None}
+
+    if disposition in {"not interested", "wrong number"}:
+        cancel_waiting(f"terminal call outcome: {disposition}")
+        lead = _lead(conn, lead_id)
+        conn.execute(
+            "INSERT OR IGNORE INTO do_not_contact(normalized_phone,lead_id,reason,source_interaction) "
+            "VALUES(?,?,?,?)",
+            (_phone(lead["phone"]), lead_id, f"Terminal outcome: {disposition}", cycle),
+        )
+        conn.execute(
+            "UPDATE leads SET lifecycle_status='not_interested',sandbox=0,updated_at=datetime('now') WHERE id=?",
+            (lead_id,),
+        )
+        conn.commit()
+        return {"outcome": "not_interested", "job_id": None}
+
+    callback_epoch = analysis.get("callback_reminder_epoch")
+    try:
+        callback_epoch = float(callback_epoch) if callback_epoch is not None else None
+    except (TypeError, ValueError):
+        callback_epoch = None
+    if callback_epoch and callback_epoch > now.timestamp():
+        cancel_waiting("buyer requested callback")
+        job_id = schedule_callback(
+            conn, lead_id=lead_id, source=source,
+            due_at=datetime.fromtimestamp(callback_epoch, timezone.utc),
+            reason=str(next_action.get("details") or "Buyer-requested callback"),
+        )
+        return {"outcome": "callback_requested", "job_id": job_id}
+
+    site_visit = bool(analysis.get("site_visit_agreed")) or action == "site visit" or disposition == "site visit"
+    if site_visit:
+        cancel_waiting("site visit agreed")
+        raw_visit = analysis.get("site_visit_datetime_iso") or next_action.get("datetime_iso")
+        visit_at = None
+        if raw_visit:
+            try:
+                visit_at = datetime.fromisoformat(str(raw_visit).replace("Z", "+00:00"))
+                if visit_at.tzinfo is None:
+                    from zoneinfo import ZoneInfo
+                    visit_at = visit_at.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            except (TypeError, ValueError):
+                visit_at = None
+        if visit_at:
+            existing = conn.execute(
+                "SELECT id FROM site_visits WHERE lead_id=? AND scheduled_at_utc=? ORDER BY id DESC LIMIT 1",
+                (lead_id, visit_at.astimezone(timezone.utc).timestamp()),
+            ).fetchone()
+            visit_id = int(existing[0]) if existing else schedule_site_visit(
+                conn, lead_id=lead_id, source=source, scheduled_at=visit_at,
+                preferred_unit=str(facts.get("property_type") or ""),
+                budget=str(facts.get("budget") or ""),
+                location=str(facts.get("preferred_location") or ""),
+                notes=str(analysis.get("summary") or "")[:1000],
+            )
+            return {"outcome": "site_visit", "job_id": visit_id}
+        conn.execute(
+            "UPDATE leads SET lifecycle_status='site_visit_scheduled',sandbox=3,updated_at=datetime('now') WHERE id=?",
+            (lead_id,),
+        )
+        conn.commit()
+        return {"outcome": "site_visit", "job_id": None}
+
+    if disposition == "interested":
+        cancel_waiting("lead entered nurture")
+        conn.execute(
+            "UPDATE leads SET lifecycle_status='interested',sandbox=3,updated_at=datetime('now') WHERE id=?",
+            (lead_id,),
+        )
+        conn.commit()
+        # The existing outcome sender delivers the immediate brochure. The
+        # autonomous queue owns the delayed nudge and ensuing Blue Loop call.
+        job_id = schedule_job(
+            conn, lead_id=lead_id, job_type=JobType.WHATSAPP_FOLLOWUP_24H,
+            source=source, due_at=add_working_hours(now, 24),
+            key=f"wa-followup:{lead_id}:{cycle}", source_type="interest_cycle",
+            source_id=cycle,
+        )
+        return {"outcome": "interested", "job_id": job_id}
+
+    conn.execute(
+        "UPDATE leads SET lifecycle_status='connected',updated_at=datetime('now') "
+        "WHERE id=? AND lifecycle_status IN ('new','campaign_calling','failed_retry_waiting')",
+        (lead_id,),
+    )
+    conn.commit()
+    return {"outcome": "connected", "job_id": None}
