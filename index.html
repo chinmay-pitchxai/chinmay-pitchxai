@@ -558,6 +558,9 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="text-label-md font-label-md text-on-surface-variant uppercase mr-2">Filter</span>
                         <button class="qf-btn px-3 py-1 bg-primary text-on-primary rounded-full text-label-sm font-label-sm uppercase" data-filter="all">All</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Pending">Pending / Queued</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Calling">Calling / Analyzing</button>
+                        <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Completed">Completed</button>
                         <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Interested">Interested</button>
                         <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Not Interested">Not Interested</button>
                         <button class="qf-btn px-3 py-1 border border-outline-variant text-on-surface-variant rounded-full text-label-sm font-label-sm uppercase hover:bg-surface-container" data-filter="Callback">Callback</button>
@@ -1375,6 +1378,7 @@
                 <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider block mb-2">Listen to Call Recording</span>
                 <audio id="transcript-audio-player" controls class="w-full focus:outline-none"></audio>
             </div>
+            <p id="transcript-media-status" class="text-xs text-on-surface-variant">Checking recording…</p>
 
             <!-- Post-call QA insights -->
             <div class="bg-surface-container-low border border-surface-container rounded-lg p-4 flex flex-col gap-3">
@@ -1388,6 +1392,18 @@
                         <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Disposition</span>
                         <span id="qa-disposition" class="text-body-sm font-semibold text-on-surface">—</span>
                     </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Emotion</span>
+                        <span id="qa-emotion" class="text-body-sm font-semibold text-on-surface">—</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Emotion Confidence</span>
+                        <span id="qa-emotion-confidence" class="text-body-sm font-semibold text-on-surface">—</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Emotion Rationale</span>
+                    <p id="qa-emotion-rationale" class="text-body-sm text-on-surface bg-surface-container-lowest p-2 border border-outline-variant rounded mt-1"></p>
                 </div>
                 <div>
                     <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">Call Summary & Remarks</span>
@@ -1433,7 +1449,7 @@
 
 <!-- Scripts loading -->
 <script src="/static/apexcharts.min.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 <script src="kpi_modal.js"></script>
 </body>
 </html>

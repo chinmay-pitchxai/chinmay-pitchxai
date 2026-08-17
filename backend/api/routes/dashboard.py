@@ -93,6 +93,39 @@ def _rating(lead: dict) -> Any:
     return "—"
 
 
+def _analysis_payload(lead: dict) -> dict:
+    raw = lead.get("analysis")
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+        return parsed if isinstance(parsed, dict) else {}
+    except (TypeError, json.JSONDecodeError):
+        return {}
+
+
+def _display_status(lead: dict) -> str:
+    """Expose the queue's live state instead of leaving queued leads pending."""
+    raw = str(lead.get("status") or "pending").strip().lower()
+    if raw not in ("", "pending"):
+        return raw
+    workflow = str(lead.get("workflow_status") or "").strip().lower()
+    if workflow in ("claimed", "running"):
+        return "dialing"
+    if workflow == "ready":
+        return "queued"
+    if workflow == "scheduled":
+        try:
+            return "queued" if float(lead.get("workflow_due_at") or 0) <= time.time() else "scheduled"
+        except (TypeError, ValueError):
+            return "scheduled"
+    if workflow == "completed":
+        return "processing"
+    if workflow in ("failed", "cancelled"):
+        return workflow
+    return raw or "pending"
+
+
 def _sandbox_of(lead: dict) -> int:
     """Determine which sandbox this lead belongs to.
 
@@ -120,7 +153,7 @@ def _sandbox_of(lead: dict) -> int:
     return 1
 
 
-def _transcript(lead: dict) -> str:
+def _transcript(lead: dict, log_id: str = "") -> str:
     """Best available transcript text for a lead row (raw JSONL / plain text).
 
     Resolves the session log_id (row ``_log_id`` or latest call attempt), then
@@ -130,7 +163,7 @@ def _transcript(lead: dict) -> str:
     the frontend can fall back to the live transcript API.
     """
     role = str(lead.get("role") or "sales_1").strip() or "sales_1"
-    log_id = str(lead.get("_log_id") or lead.get("log_id") or "").strip()
+    log_id = str(log_id or lead.get("resolved_log_id") or lead.get("_log_id") or lead.get("log_id") or "").strip()
     if not log_id:
         try:
             from core.storage import resolve_lead_session_log_id_sync
@@ -164,8 +197,8 @@ def _transcript(lead: dict) -> str:
     return ""
 
 
-def _transcript_url(lead: dict) -> str:
-    log_id = str(lead.get("_log_id") or lead.get("log_id") or "").strip()
+def _transcript_url(lead: dict, log_id: str = "") -> str:
+    log_id = str(log_id or lead.get("resolved_log_id") or lead.get("_log_id") or lead.get("log_id") or "").strip()
     if not log_id or lead.get("id") is None:
         return ""
     role_key = str(lead.get("role") or "sales_1").strip() or "sales_1"
@@ -186,22 +219,20 @@ def _to_ts(value: Any) -> float:
     return 0.0
 
 
-def _lead_payload(row: Any) -> dict:
+def _lead_payload(row: Any, *, include_transcript: bool = False) -> dict:
     lead = dict(row)
-    status = (lead.get("status") or "").strip().lower()
+    status = _display_status(lead)
     start_time = lead.get("start_time")
     called_at_iso = None
     ts_start = _to_ts(start_time)
     if ts_start:
         called_at_iso = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(ts_start))
     duration = 0
-    analysis = lead.get("analysis")
-    if analysis:
-        try:
-            parsed = json.loads(analysis) if isinstance(analysis, str) else analysis
-            duration = int(parsed.get("call_duration_sec") or 0)
-        except Exception:
-            duration = 0
+    analysis_obj = _analysis_payload(lead)
+    try:
+        duration = int(analysis_obj.get("call_duration_sec") or lead.get("duration_sec") or 0)
+    except (TypeError, ValueError):
+        duration = 0
     # Upload provenance: file uploads store the original filename in
     # ``extra.upload_source``; Google Sheet broker rows store ``extra.broker_id``.
     extra_obj = {}
@@ -213,6 +244,12 @@ def _lead_payload(row: Any) -> dict:
                 extra_obj = parsed
         except Exception:
             extra_obj = {}
+    log_id = str(lead.get("resolved_log_id") or lead.get("_log_id") or lead.get("log_id") or "").strip()
+    role_key = str(lead.get("role") or "sales_1").strip() or "sales_1"
+    recording_url = (
+        f"/api/campaign/lead/{int(lead['id'])}/recording?role={role_key}&log_id={log_id}"
+        if log_id else ""
+    )
     return {
         "id": int(lead["id"]),
         "name": lead.get("name") or "",
@@ -225,15 +262,32 @@ def _lead_payload(row: Any) -> dict:
         "upload_source": (extra_obj.get("upload_source") or lead.get("source_file") or ""),
         "broker_id": extra_obj.get("broker_id") or "",
         "extra": extra_obj,
-        "status": (lead.get("status") or "pending").strip(),
+        "status": status,
+        "raw_status": (lead.get("status") or "pending").strip(),
+        "workflow_status": lead.get("workflow_status") or "",
+        "workflow_job_type": lead.get("workflow_job_type") or "",
+        "workflow_due_at": lead.get("workflow_due_at"),
+        "attempt_number": int(lead.get("workflow_attempt") or 0),
+        "claimed_by_number": lead.get("claimed_by_number") or "",
         "disposition": _disposition(lead),
         "error": lead.get("error") or "—",
         "rating": _rating(lead),
         "summary": _summary(lead),
-        "transcript": _transcript(lead),
-        "log_id": lead.get("_log_id") or lead.get("log_id") or "",
-        "transcript_url": _transcript_url(lead),
+        # List responses stay lightweight. The modal fetches the transcript on
+        # demand from transcript_url, avoiding filesystem reads for every lead
+        # every three seconds in large campaigns.
+        "transcript": _transcript(lead, log_id) if include_transcript else "",
+        "log_id": log_id,
+        "transcript_url": _transcript_url(lead, log_id),
+        "recording_url": recording_url,
+        "recording_available": False,
+        "recording_pending": bool(log_id),
         "duration_sec": duration,
+        "emotion_label": analysis_obj.get("emotion_label") or lead.get("emotion_label") or "Unknown",
+        "emotion_rationale": analysis_obj.get("emotion_rationale") or lead.get("emotion_rationale") or "",
+        "emotion_confidence": analysis_obj.get("emotion_confidence", lead.get("emotion_confidence")),
+        "outcome": analysis_obj.get("disposition") or _disposition(lead),
+        "next_action": analysis_obj.get("next_action") or {},
         "created_at": _to_ts(lead.get("created_at")),
         "start_time": ts_start if ts_start else None,
         "called_at_iso": called_at_iso,
@@ -252,14 +306,26 @@ def _fetch_leads(limit: int, role: str = "") -> list[dict]:
     where = ""
     if role:
         wanted_role = role.strip().lower()
-        where = "WHERE role = ?"
+        where = "WHERE l.role = ?"
         params.append(wanted_role)
     rows = conn.execute(
-        f"""SELECT id, role, name, phone, email, company, status, analysis,
-                  error, extra, start_time, created_at, whatsapp_sent,
-                  failed_call_retries, segment, source_file, sandbox, source, _log_id
-            FROM leads {where}
-            ORDER BY COALESCE(start_time, 0) DESC LIMIT ?""",
+        f"""SELECT l.id, l.role, l.name, l.phone, l.email, l.company, l.status, l.analysis,
+                  l.error, l.extra, l.start_time, l.created_at, l.whatsapp_sent,
+                  l.failed_call_retries, l.segment, l.source_file, l.sandbox, l.source, l._log_id,
+                  w.status AS workflow_status, w.job_type AS workflow_job_type,
+                  w.due_at_utc AS workflow_due_at, w.attempt_number AS workflow_attempt,
+                  w.claimed_by_number,
+                  COALESCE(NULLIF(TRIM(l._log_id), ''), (
+                      SELECT ca.log_id FROM call_attempts ca
+                      WHERE ca.lead_id=l.id AND COALESCE(TRIM(ca.log_id), '') != ''
+                      ORDER BY ca.id DESC LIMIT 1
+                  )) AS resolved_log_id
+            FROM leads l
+            LEFT JOIN workflow_jobs w ON w.id=(
+                SELECT MAX(w2.id) FROM workflow_jobs w2 WHERE w2.lead_id=l.id
+            )
+            {where}
+            ORDER BY COALESCE(l.start_time, 0) DESC, l.id DESC LIMIT ?""",
         tuple(params + [limit]),
     ).fetchall()
     return [_lead_payload(r) for r in rows]

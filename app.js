@@ -290,6 +290,22 @@
             rating: (typeof l.rating === "number") ? l.rating : "—",
             summary: l.summary || "No summary yet.",
             transcript: l.transcript || [],
+            transcript_url: l.transcript_url || "",
+            log_id: l.log_id || "",
+            recording_url: l.recording_url || "",
+            recording_available: !!l.recording_available,
+            recording_pending: !!l.recording_pending,
+            emotion_label: l.emotion_label || "Unknown",
+            emotion_rationale: l.emotion_rationale || "",
+            emotion_confidence: (typeof l.emotion_confidence === 'number') ? l.emotion_confidence : null,
+            outcome: l.outcome || l.disposition || "Pending",
+            next_action: (l.next_action && typeof l.next_action === 'object') ? l.next_action : {},
+            raw_status: l.raw_status || l.status || "pending",
+            workflow_status: l.workflow_status || "",
+            workflow_job_type: l.workflow_job_type || "",
+            workflow_due_at: l.workflow_due_at || null,
+            attempt_number: Number(l.attempt_number || 0),
+            claimed_by_number: l.claimed_by_number || "",
             duration_sec: l.duration_sec || 0,
             created_at: l.created_at || 0,
             start_time: l.start_time || null,
@@ -408,7 +424,9 @@
 
     // --- Helper Utilities ---
     window.isCalled = function(lead) {
-        return lead.status !== 'pending' && lead.status !== 'inbound';
+        if (lead.start_time || lead.log_id) return true;
+        return !['pending', 'inbound', 'queued', 'scheduled', 'dialing', 'processing']
+            .includes(String(lead.status || '').toLowerCase());
     };
 
     window.isFailed = function(lead) {
@@ -426,6 +444,10 @@
         if (status === 'completed') return 'Answered';
         if (status === 'failed') return 'No Answer';
         if (status === 'inbound') return 'Inbound';
+        if (status === 'queued') return 'Queued';
+        if (status === 'scheduled') return 'Scheduled';
+        if (status === 'dialing') return 'Calling';
+        if (status === 'processing') return 'Analyzing';
         return status;
     };
 
@@ -1042,6 +1064,12 @@
             filtered = filtered.filter(isFailed);
         } else if (window.appState.currentFilter === 'Inbound') {
             filtered = filtered.filter(l => l.status === 'inbound');
+        } else if (window.appState.currentFilter === 'Pending') {
+            filtered = filtered.filter(l => ['pending', 'queued', 'scheduled'].includes(String(l.status).toLowerCase()));
+        } else if (window.appState.currentFilter === 'Calling') {
+            filtered = filtered.filter(l => ['dialing', 'processing'].includes(String(l.status).toLowerCase()));
+        } else if (window.appState.currentFilter === 'Completed') {
+            filtered = filtered.filter(l => window.isCalled(l) && !window.isFailed(l));
         } else if (window.appState.currentFilter === 'star4') {
             filtered = filtered.filter(l => typeof l.rating === 'number' && l.rating >= 4);
         }
@@ -1121,13 +1149,16 @@
                 badgeClass = 'bg-error-container text-error';
             }
 
-            const dispoText = lead.status === 'inbound' ? 'Inbound' : lead.disposition;
+            const liveStatus = String(lead.status || '').toLowerCase();
+            const dispoText = ['pending', 'queued', 'scheduled', 'dialing', 'processing'].includes(liveStatus)
+                ? prettyStatus(liveStatus)
+                : (lead.status === 'inbound' ? 'Inbound' : lead.disposition);
 
             // Inbound row styling
             const rowClass = lead.status === 'inbound' ? 'bg-secondary-fixed/20' : 'hover:bg-surface-container-low transition-colors';
 
-            const listenBtn = lead.duration_sec > 0
-                ? `<button class="text-primary hover:underline flex items-center gap-1 font-medium" onclick="event.stopPropagation();window.playAudioRecording('${lead.name}', ${lead.id})">
+            const listenBtn = (lead.log_id || lead.recording_url || lead.duration_sec > 0)
+                ? `<button class="text-primary hover:underline flex items-center gap-1 font-medium" onclick="event.stopPropagation();window.playAudioRecording(${lead.id})">
                      <span class="material-symbols-outlined text-sm">play_circle</span> Listen
                    </button>`
                 : '—';
@@ -1158,22 +1189,34 @@
     };
 
     // --- Audio Player Modal Handler ---
-    window.playAudioRecording = function(name, leadId) {
+    window.playAudioRecording = async function(leadId) {
+        const lead = window.appState.allLeads.find(item => item.id === leadId);
         const title = document.getElementById('audio-modal-title');
         const audio = document.getElementById('audio-player-tag');
-        if (title) title.textContent = `Call Recording: ${name}`;
-        
-        if (audio) {
-            // Use realistic demo call files
-            const index = leadId % 2;
-            audio.src = index === 0 
-                ? "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-                : "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3";
-            audio.load();
-        }
-
+        if (title) title.textContent = `Call Recording: ${lead?.name || 'Lead'}`;
         window.openModal('modal-audio-player');
-        if (audio) audio.play().catch(() => {});
+        try {
+            const role = encodeURIComponent(window.dashRoleForApi());
+            const mediaRes = await fetch(
+                window.apiBase + `/api/campaign/lead/${leadId}/media?role=${role}`,
+                {cache: 'no-store', headers: window.dashAuthHeaders()}
+            );
+            const media = mediaRes.ok ? await mediaRes.json() : {};
+            if (!media.recording_available || !media.recording_url) {
+                throw new Error(media.recording_pending
+                    ? 'Recording is still processing. Try again shortly.'
+                    : 'No recording is available for this lead.');
+            }
+            if (lead) Object.assign(lead, media);
+            if (audio) {
+                audio.src = media.recording_url;
+                audio.load();
+                await audio.play();
+            }
+        } catch (error) {
+            window.closeModal('modal-audio-player');
+            window.showToast(error.message || 'Recording could not be loaded.', 'error');
+        }
     };
 
     window.closeAudioPlayer = function() {
@@ -1183,10 +1226,13 @@
     };
 
     // --- Transcript & QA Modal Handler ---
-    window.openTranscriptModal = function(leadId) {
-        const lead = window.appState.allLeads.find(l => l.id === leadId);
-        if (!lead) return;
+    function escapeLeadHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
 
+    function renderLeadDetail(lead) {
         // Set titles
         document.getElementById('transcript-modal-title').textContent = `Call Detail: ${lead.name}`;
         document.getElementById('transcript-modal-subtitle').textContent = `${lead.phone} • Status: ${prettyStatus(lead.status)}`;
@@ -1195,14 +1241,23 @@
         document.getElementById('qa-duration').textContent = lead.duration_sec > 0 ? lead.duration_sec + ' seconds' : '—';
         document.getElementById('qa-disposition').textContent = lead.disposition;
         document.getElementById('qa-summary').textContent = lead.summary;
+        document.getElementById('qa-emotion').textContent = lead.emotion_label || 'Unknown';
+        document.getElementById('qa-emotion-confidence').textContent =
+            typeof lead.emotion_confidence === 'number'
+                ? `${Math.round(lead.emotion_confidence * 100)}% confidence` : '—';
+        document.getElementById('qa-emotion-rationale').textContent = lead.emotion_rationale || 'No emotion rationale generated yet.';
 
         const recContainer = document.getElementById('transcript-rec-player');
+        const mediaStatus = document.getElementById('transcript-media-status');
         const recSrc = lead.recording_url || lead.recording_path || '';
-        if (recSrc) {
+        if (lead.recording_available && recSrc) {
             recContainer.style.display = 'block';
             document.getElementById('transcript-audio-player').src = recSrc;
+            if (mediaStatus) mediaStatus.textContent = 'Recording ready.';
         } else {
             recContainer.style.display = 'none';
+            if (mediaStatus) mediaStatus.textContent = lead.recording_pending
+                ? 'Recording is still processing…' : 'No recording is available for this attempt.';
         }
 
         // Populate transcript dialogue
@@ -1211,7 +1266,7 @@
 
         if (typeof lead.transcript === 'string' && lead.transcript.trim()) {
             const plain = lead.transcript.split('\n').filter(l => l.trim()).map(l => l.trim()).join('\n');
-            container.innerHTML = `<pre class="p-4 bg-surface-container-lowest border border-outline-variant rounded text-xs text-on-surface whitespace-pre-wrap break-words m-0 max-h-72 overflow-y-auto">${plain.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+            container.innerHTML = `<pre class="p-4 bg-surface-container-lowest border border-outline-variant rounded text-xs text-on-surface whitespace-pre-wrap break-words m-0 max-h-72 overflow-y-auto">${escapeLeadHtml(plain)}</pre>`;
         } else if (Array.isArray(lead.transcript) && lead.transcript.length > 0) {
             let html = '';
             lead.transcript.forEach(t => {
@@ -1222,8 +1277,8 @@
                 
                 html += `
                 <div class="flex flex-col ${alignmentClass} gap-1 mb-2">
-                    <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">${sender} • ${t.time}</span>
-                    <div class="chat-bubble ${bubbleClass}">${t.text}</div>
+                    <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">${escapeLeadHtml(sender)} • ${escapeLeadHtml(t.time || '')}</span>
+                    <div class="chat-bubble ${bubbleClass}">${escapeLeadHtml(t.text || '')}</div>
                 </div>
                 `;
             });
@@ -1232,7 +1287,48 @@
             container.innerHTML = `<div class="p-8 text-center text-on-surface-variant font-medium">No voice dialogue recorded for this attempt.</div>`;
         }
 
+    }
+
+    window.openTranscriptModal = async function(leadId) {
+        const lead = window.appState.allLeads.find(l => l.id === leadId);
+        if (!lead) return;
         window.openModal('modal-call-transcript');
+        renderLeadDetail(lead);
+        const container = document.getElementById('transcript-chat-container');
+        if (container) container.innerHTML = '<div class="p-8 text-center text-on-surface-variant">Loading call details…</div>';
+        try {
+            const role = encodeURIComponent(window.dashRoleForApi());
+            const headers = window.dashAuthHeaders();
+            const [mediaRes, bestRes] = await Promise.all([
+                fetch(window.apiBase + `/api/campaign/lead/${leadId}/media?role=${role}`, {cache:'no-store', headers}),
+                fetch(window.apiBase + `/api/campaign/lead/${leadId}/best?role=${role}`, {cache:'no-store', headers}),
+            ]);
+            if (bestRes.ok) {
+                const bestBody = await bestRes.json();
+                const best = bestBody.best || {};
+                if (best.summary) lead.summary = best.summary;
+                if (best.disposition) lead.disposition = best.disposition;
+                if (best.duration_sec) lead.duration_sec = best.duration_sec;
+                if (best.rating != null) lead.rating = best.rating;
+                if (best.log_id) lead.log_id = best.log_id;
+                if (best.transcript_url) lead.transcript_url = best.transcript_url;
+                if (best.recording_url) lead.recording_url = best.recording_url;
+                if (best.recording_available != null) lead.recording_available = best.recording_available;
+                if (best.recording_pending != null) lead.recording_pending = best.recording_pending;
+            }
+            // Media is authoritative and may actively fetch a carrier recording;
+            // apply it after the non-fetching best-attempt response.
+            if (mediaRes.ok) Object.assign(lead, await mediaRes.json());
+            if (lead.transcript_url) {
+                const transcriptRes = await fetch(lead.transcript_url, {cache:'no-store', headers});
+                if (transcriptRes.ok) lead.transcript = await transcriptRes.text();
+            }
+            renderLeadDetail(lead);
+        } catch (error) {
+            console.warn('Lead detail load failed', error);
+            renderLeadDetail(lead);
+            window.showToast('Some call details are still processing.', 'info');
+        }
     };
 
     // --- Expose Global View Switcher ---
@@ -2755,15 +2851,15 @@
          window.pollCampaignStatus();
          setInterval(() => { window.pollCampaignStatus(); }, 5000);
 
-         // Auto-refresh real leads every 3s so status transitions
+         // Auto-refresh real leads every 3s so orchestration status transitions
          // (pending -> dialing -> completed/failed) appear live without a
          // manual reload. Cheap: dashboard/leads is a direct DB read.
          setInterval(() => {
-             const dot = document.getElementById('campaign-status-dot');
-             const active = dot && (dot.className || '').includes('pulse-active');
-             if (active) {
-                 window.loadRealLeads().then(() => window.updateDashboardUI());
-             }
+             if (document.hidden || window._leadRefreshInFlight) return;
+             window._leadRefreshInFlight = true;
+             window.loadRealLeads()
+                 .then(() => window.updateDashboardUI())
+                 .finally(() => { window._leadRefreshInFlight = false; });
          }, 3000);
 
         // 1. Sidebar views navigation
