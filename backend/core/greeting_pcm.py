@@ -35,33 +35,36 @@ def greeting_pcm_paths(role: str, variant: str = "") -> tuple[Path, Path]:
     return base / f"{stem}.pcm", base / f"{stem}.pcm.meta"
 
 
+def _greeting_profile_matches(meta: dict, role: str = "") -> bool:
+    """Require cached audio to use the active voice and delivery profile."""
+    if not role:
+        return True
+    from core.state import resolved_live_voice_profile
+
+    expected_voice, style = resolved_live_voice_profile(role)
+    want_style = _text_hash(style)
+    stored_style = str(meta.get("style_hash") or "").strip()
+    if want_style and stored_style != want_style:
+        logger.info("Greeting style prompt changed for {}, will regenerate", role)
+        return False
+    stored_voice = str(meta.get("voice") or "").strip()
+    if expected_voice and stored_voice != expected_voice:
+        logger.info("Greeting voice changed for {}, will regenerate", role)
+        return False
+    return True
+
+
 def _greeting_meta_matches(meta: dict, text: str, role: str = "") -> bool:
-    """If meta has text_hash, require it to match current greeting text."""
+    """Require both current greeting text and current live voice profile."""
+    if not _greeting_profile_matches(meta, role):
+        return False
     want = _text_hash(text)
     if not want:
         return True
     stored = str(meta.get("text_hash") or "").strip()
     if not stored:
         return True
-    if stored != want:
-        return False
-    
-    # Also check style prompt hash if role is provided
-    if role:
-        from core.state import resolved_live_voice_profile
-
-        expected_voice, style = resolved_live_voice_profile(role)
-        want_style = _text_hash(style)
-        stored_style = str(meta.get("style_hash") or "").strip()
-        if want_style and stored_style != want_style:
-            logger.info("Greeting style prompt changed for {}, will regenerate", role)
-            return False
-        stored_voice = str(meta.get("voice") or "").strip()
-        if expected_voice and stored_voice != expected_voice:
-            logger.info("Greeting voice changed for {}, will regenerate", role)
-            return False
-            
-    return True
+    return stored == want
 
 
 def load_recorded_greeting_pcm(
@@ -81,7 +84,7 @@ def load_recorded_greeting_pcm(
         except Exception as exc:
             logger.warning("Invalid greeting meta {}: {}", meta_path, exc)
     matches = _greeting_meta_matches(meta, greeting_text, role=role)
-    if not matches and role:
+    if not matches and role and _greeting_profile_matches(meta, role):
         try:
             from core.state import resolved_greeting_text
             template_text = resolved_greeting_text(role)

@@ -34,6 +34,20 @@ class VoiceProfileTests(unittest.TestCase):
         self.assertTrue(result.endswith("Natural Indian accent"))
         self.assertIn("HIGHEST PRIORITY", result)
 
+    def test_old_greeting_profile_cannot_pass_text_tolerance(self):
+        from core.greeting_pcm import _greeting_meta_matches
+
+        old_meta = {
+            "text_hash": "legacy",
+            "style_hash": "old-style",
+            "voice": "Aoede",
+        }
+        with patch(
+            "core.state.resolved_live_voice_profile",
+            return_value=("Aoede", "New natural Indian human delivery"),
+        ):
+            self.assertFalse(_greeting_meta_matches(old_meta, "same greeting", "sales_1"))
+
 
 if __name__ == "__main__":
     unittest.main()
