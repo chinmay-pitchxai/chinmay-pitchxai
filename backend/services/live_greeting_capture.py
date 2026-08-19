@@ -89,15 +89,17 @@ async def capture_phrase_pcm(
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not configured")
 
-    voice = settings.gemini_live_voice
-    if role == "sales_1" and settings.gemini_live_voice_sales_1:
-        voice = settings.gemini_live_voice_sales_1
+    from core.state import resolved_live_voice_profile
+
+    voice, voice_style = resolved_live_voice_profile(role)
     model = settings.gemini_live_model
 
     system_prompt = (
         "You are a voice agent on a phone call. Speak ONLY the exact sentence you are given. "
         "One sentence, natural Indian English delivery, then stop."
     )
+    if voice_style:
+        system_prompt += f"\nVoice delivery: {voice_style}"
     setup = build_live_setup(
         model=model,
         system_instruction=system_prompt,
@@ -179,12 +181,12 @@ async def capture_live_greeting_pcm(
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY (or GOOGLE_API_KEY) is not configured")
 
-    voice = settings.gemini_live_voice
-    if role == "sales_1" and settings.gemini_live_voice_sales_1:
-        voice = settings.gemini_live_voice_sales_1
+    from core.state import resolved_live_voice_profile
+
+    voice, voice_style = resolved_live_voice_profile(role)
     model = settings.gemini_live_model
 
-    style = getattr(settings, "gemini_opening_style_prompt_female", "").strip()
+    style = voice_style
 
     system_prompt = (
         "You are recording one prerecorded phone greeting for a real-estate outbound call.\n"

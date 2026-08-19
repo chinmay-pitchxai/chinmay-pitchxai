@@ -2497,7 +2497,9 @@
             set('config-prompt', d.prompt);
             set('config-rag', d.rag);
             set('config-greeting', d.greeting_text);
-            set('config-language', d.language || 'te-IN');
+            set('config-language', d.language || 'en-IN');
+            set('config-voice', d.voice || 'Aoede');
+            set('config-voice-style', d.voice_style || '');
             const mirrorEl = document.getElementById('config-multilingual-mirror');
             if (mirrorEl) mirrorEl.checked = !(d.multilingual_mirror === false);
         } catch (e) {
@@ -2516,6 +2518,8 @@
             greeting_text: (document.getElementById('config-greeting')?.value || '').trim(),
             language: (document.getElementById('config-language')?.value || '').trim(),
             multilingual_mirror: !!(document.getElementById('config-multilingual-mirror')?.checked),
+            voice: (document.getElementById('config-voice')?.value || 'Aoede').trim(),
+            voice_style: (document.getElementById('config-voice-style')?.value || '').trim(),
         };
         try {
             const res = await fetch(window.apiBase + `/api/tuning?role=${role}`, {
@@ -2525,7 +2529,7 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : (data.detail || res.statusText));
-            window.showToast('Configuration saved.', 'success');
+            window.showToast('Configuration saved. Voice profile will apply to the next call.', 'success');
         } catch (e) {
             window.showToast('Save failed: ' + (e.message || e), 'error');
         }

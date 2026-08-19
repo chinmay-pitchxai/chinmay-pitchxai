@@ -359,11 +359,14 @@ async def get_tuning(request: Request):
         "rag": rag,
         "greeting_text": greeting
     }
-    from core.state import resolved_live_language
+    from core.state import resolved_live_language, resolved_live_voice_profile
 
     _lang, _mirror = resolved_live_language(role)
     result["language"] = _lang
     result["multilingual_mirror"] = _mirror
+    _voice, _voice_style = resolved_live_voice_profile(role)
+    result["voice"] = _voice
+    result["voice_style"] = _voice_style
     for i in range(1, 10):
         result[f"p{i}_number"] = state.get(f"p{i}_number", "") or getattr(settings, f"p{i}_number", "") or ""
     return result
@@ -384,6 +387,8 @@ class TuningUpdate(BaseModel):
     # Voice & language plug-and-play (mirrors Gemini Live languageCode + prompt)
     language: str = ""            # primary language code, e.g. "te-IN" (Telugu)
     multilingual_mirror: bool = True  # mirror the caller's language when different
+    voice: str = ""
+    voice_style: str = ""
 
 @router.post("/api/tuning")
 async def update_tuning(data: TuningUpdate, request: Request):
@@ -460,9 +465,23 @@ async def update_tuning(data: TuningUpdate, request: Request):
             vc["language"] = (data.language or "").strip()
         if sent_keys and "multilingual_mirror" in sent_keys:
             vc["multilingual_mirror"] = bool(data.multilingual_mirror)
+        if sent_keys and "voice" in sent_keys:
+            from core.state import _GEMINI_LIVE_VOICES
+
+            requested_voice = (data.voice or "").strip()
+            if requested_voice not in _GEMINI_LIVE_VOICES:
+                raise HTTPException(400, "Unsupported Gemini Live voice")
+            vc["voice"] = requested_voice
+        if sent_keys and "voice_style" in sent_keys:
+            requested_style = (data.voice_style or "").strip()
+            if len(requested_style) > 2000:
+                raise HTTPException(400, "Voice style must be 2000 characters or fewer")
+            vc["voice_style"] = requested_style
         save_role_state(role, vobiz_config=vc)
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.warning("language config save failed (non-fatal): {}", exc)
+        logger.warning("voice/language config save failed (non-fatal): {}", exc)
 
     # Keep prompt + KB files in sync — build_role_system_prompt() prefers non-empty DB,
     # then falls back to these files when the DB field is empty.
@@ -761,14 +780,16 @@ async def record_greeting_tts(data: GreetingTextBody, request: Request):
     if not text:
         raise HTTPException(400, "greeting_text is required")
 
-    from config import settings
     from core.greeting_pcm import _generate_and_cache_greeting, greeting_pcm_paths
+    from core.state import resolved_live_voice_profile
+
+    live_voice, _ = resolved_live_voice_profile(role)
 
     try:
         result = await _generate_and_cache_greeting(
             role,
             text,
-            settings.gemini_live_voice,
+            live_voice,
         )
     except Exception as exc:
         logger.exception("record-greeting failed")
@@ -820,10 +841,10 @@ async def capture_greeting_live(data: GreetingTextBody, request: Request):
                 role, pcm, sr, variant=variant, greeting_text=text
             )
         else:
-            from config import settings
             from core.greeting_pcm import _write_greeting_cache_files, greeting_pcm_paths
+            from core.state import resolved_live_voice_profile
 
-            live_voice = (settings.gemini_live_voice or "Aoede").strip()
+            live_voice, _ = resolved_live_voice_profile(role)
             _write_greeting_cache_files(
                 role, text, pcm, sr, source="gemini_live_capture", voice=live_voice
             )

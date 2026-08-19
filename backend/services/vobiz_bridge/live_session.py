@@ -934,10 +934,6 @@ async def handle_vobiz_ws_live(
             opening_line = _build_opening_line({"name": lead_name or ""}, role)
             logger.info("Incoming call leg routed to role={} (camp_id={}) lead={}", role, camp_id, lead_name or "")
 
-    # Per-role voice override (single Technopolis console role).
-    if role == "sales_1" and settings.gemini_live_voice_sales_1:
-        voice = settings.gemini_live_voice_sales_1
-
     # Restart Resilience: If memory was lost, recover from agent_id or camp_id string
     if not system_prompt and (agent_id or (camp_id and camp_id.startswith("sandbox-"))):
         if not agent_id and camp_id:
@@ -968,6 +964,15 @@ async def handle_vobiz_ws_live(
             and rag_mode == "embed"
         )
         system_prompt = build_role_system_prompt(role, role_config, embed_rag=embed_kb)
+
+    # Voice delivery is a separate runtime profile. It is deliberately applied
+    # after the editable business prompt so a prompt rewrite cannot silently
+    # remove the Indian accent/human phone-call delivery requirements.
+    voice_style = ""
+    if role == "sales_1":
+        from core.state import resolved_live_voice_profile
+
+        voice, voice_style = resolved_live_voice_profile(role)
 
     # Extract agent name from prompt file for dynamic persona anchoring
     from prompts.role_prompts import extract_agent_name
@@ -2817,6 +2822,10 @@ async def handle_vobiz_ws_live(
             from core.state import resolved_live_language
 
             _live_lang, _mirror = resolved_live_language(role)
+            if voice_style:
+                from core.state import append_live_voice_style
+
+                system_prompt = append_live_voice_style(system_prompt, voice_style)
             if _mirror:
                 _lang_instruction = (
                     "\n\n[LANGUAGE MIRROR — ABSOLUTE] The caller's language decides your language. "
