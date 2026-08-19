@@ -23,6 +23,7 @@ from core.workflow_queue import (
     create_job,
     promote_due,
     recover_completed_pending_phone_jobs,
+    recover_jobless_pending_digital_leads,
 )
 from core.orchestration_dispatcher import dispatch_once
 from core.storage import close_db, init_db
@@ -236,6 +237,25 @@ class QueueTests(unittest.TestCase):
             ).fetchone()
             self.assertEqual(row["status"], "scheduled")
             self.assertEqual(row["error"], "Recovered incomplete dispatch")
+        finally:
+            c.close()
+
+    def test_jobless_pending_digital_lead_is_queued_once(self):
+        c = self.conn()
+        try:
+            c.execute(
+                "UPDATE leads SET role='sales_1',source='digital',sandbox=1,status='pending' WHERE id=1"
+            )
+            c.commit()
+            self.assertEqual(recover_jobless_pending_digital_leads(c), 1)
+            self.assertEqual(recover_jobless_pending_digital_leads(c), 0)
+            row = c.execute(
+                "SELECT job_type,status,eligible_pool FROM workflow_jobs WHERE lead_id=1"
+            ).fetchone()
+            self.assertEqual(
+                (row["job_type"], row["status"], row["eligible_pool"]),
+                ("fresh_call", "scheduled", "sandbox1_digital"),
+            )
         finally:
             c.close()
 

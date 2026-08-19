@@ -278,6 +278,39 @@ def recover_completed_pending_phone_jobs(conn: sqlite3.Connection) -> int:
     return len(rows)
 
 
+def recover_jobless_pending_digital_leads(conn: sqlite3.Connection) -> int:
+    """Create the missing first-call job for orphaned pending Digital Leads.
+
+    Early ingestion builds could persist a lead before queue creation and then
+    treat every later sheet poll as a duplicate. Restrict this repair to
+    Sandbox 1 digital leads with no workflow history at all, so completed or
+    intentionally cancelled campaigns are never redialed on restart.
+    """
+    rows = conn.execute(
+        """SELECT l.id FROM leads l
+        WHERE lower(COALESCE(l.status,'pending'))='pending'
+          AND lower(COALESCE(l.source,'')) IN ('digital','digital_marketing')
+          AND COALESCE(l.sandbox,1)=1
+          AND NOT EXISTS (SELECT 1 FROM workflow_jobs j WHERE j.lead_id=l.id)
+        ORDER BY l.id ASC"""
+    ).fetchall()
+    for (lead_id,) in rows:
+        create_job(
+            conn,
+            lead_id=int(lead_id),
+            job_type="fresh_call",
+            priority=6,
+            due_at_utc=time.time(),
+            eligible_pool="sandbox1_digital",
+            idempotency_key=f"recovered-jobless-digital:{int(lead_id)}",
+            source_type="startup_recovery",
+            source_id="jobless_digital",
+            attempt_number=1,
+            payload={"sub_sandbox": "1.2", "recovered": True},
+        )
+    return len(rows)
+
+
 def fail_job(conn: sqlite3.Connection, job_id: int, claim_token: str, error: str) -> bool:
     cur = conn.execute(
         "UPDATE workflow_jobs SET status='failed',error=?,updated_at=datetime('now') "
