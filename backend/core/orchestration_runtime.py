@@ -188,10 +188,19 @@ async def orchestration_supervisor() -> None:
     if status["mode"] == "live":
         from core.live_job_executor import execute_phone_job, execute_whatsapp_job
         from core.orchestration_dispatcher import dispatch_once
+        from core.workflow_queue import recover_completed_pending_phone_jobs
         pools = configured_pools(settings)
-        # busy_numbers: number -> active concurrent call count. The digital
-        # sub-sandbox registers P3 twice in its pool so it can run 2 calls.
+        # busy_numbers: number -> active concurrent call count. Digital Leads
+        # registers P3 once, enforcing one-after-another dispatch.
         busy_numbers: dict[str, int] = {}
+
+        repair_conn = new_db_connection()
+        try:
+            recovered = recover_completed_pending_phone_jobs(repair_conn)
+            if recovered:
+                logger.warning("Recovered {} incomplete phone workflow job(s)", recovered)
+        finally:
+            repair_conn.close()
 
         async def dispatcher_worker(worker_id: int) -> None:
             conn = new_db_connection()

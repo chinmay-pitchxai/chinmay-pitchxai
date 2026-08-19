@@ -11,10 +11,10 @@ from collections.abc import Awaitable, Callable
 
 from core.number_allocator import allocate_number, relationship_number_for_source
 from core.workflow_models import NumberPool
-from core.workflow_queue import claim_next, complete_job, fail_job, promote_due
+from core.workflow_queue import claim_next, complete_job, defer_job, fail_job, promote_due
 from core.business_hours import is_within_working_hours
 
-Executor = Callable[[dict, str | None], Awaitable[None] | None]
+Executor = Callable[[dict, str | None], Awaitable[object] | object]
 
 # Guards the busy-numbers capacity check+increment so multiple dispatcher
 # workers (orchestration_worker_count>1) cannot both pass the pre-check for
@@ -145,8 +145,8 @@ async def dispatch_once(
             # The resolved line may differ from the pre-peeked one — re-check
             # line lock and anti-spam cooldown against the actual line before
             # dialing, releasing the claim back to ready if it is unavailable.
-            # Capacity = pool-tuple occurrences (P3 x2 in the digital pool
-            # allows two concurrent calls on that one line).
+            # Capacity = pool-tuple occurrences. Digital P3 appears once, so
+            # uploaded leads are dialed strictly one after another.
             pool_capacity = sum(1 for x in pools.get(pool, ()) if x == claimed_number) or 1
             # busy_numbers is a dict (number -> active count) in production;
             # legacy callers/tests may still pass a plain set — handle both.
@@ -167,7 +167,17 @@ async def dispatch_once(
         try:
             result = executor(job, claimed_number or None)
             if inspect.isawaitable(result):
-                await result
+                result = await result
+            if isinstance(result, dict) and result.get("retryable"):
+                defer_job(
+                    conn,
+                    job["id"],
+                    job["claim_token"],
+                    delay_seconds=float(result.get("retry_after_sec") or 1.0),
+                    reason=str(result.get("error") or "Dialing capacity temporarily unavailable"),
+                )
+                job["dispatch_status"] = "deferred"
+                return job
             complete_job(conn, job["id"], job["claim_token"])
             if claimed_number and number_cooling and hasattr(number_cooling, "record"):
                 number_cooling.record(claimed_number)

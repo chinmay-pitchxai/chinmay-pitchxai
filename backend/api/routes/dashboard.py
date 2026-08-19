@@ -119,8 +119,13 @@ def _display_status(lead: dict) -> str:
             return "queued" if float(lead.get("workflow_due_at") or 0) <= time.time() else "scheduled"
         except (TypeError, ValueError):
             return "scheduled"
+    # A completed queue job is not itself proof that transcript analysis is
+    # running. The lead outcome owns terminal/processing status. Older builds
+    # could complete a job after a transient line-capacity miss, leaving the
+    # lead pending; showing that as ANALYZING was both inaccurate and hid the
+    # stuck queue state.
     if workflow == "completed":
-        return "processing"
+        return raw or "pending"
     if workflow in ("failed", "cancelled"):
         return workflow
     return raw or "pending"

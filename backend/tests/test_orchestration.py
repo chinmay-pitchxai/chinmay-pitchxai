@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -16,7 +17,13 @@ import helpers  # noqa: E402  (Postgres test DB + reset)
 from core.business_hours import add_working_hours
 from core.number_allocator import allocate_number, configured_pools, pool_for, relationship_number_for_source, validate_live_pools
 from core.workflow_models import JobType, LeadStage, NumberPool, can_transition
-from core.workflow_queue import claim_next, complete_job, create_job, promote_due
+from core.workflow_queue import (
+    claim_next,
+    complete_job,
+    create_job,
+    promote_due,
+    recover_completed_pending_phone_jobs,
+)
 from core.orchestration_dispatcher import dispatch_once
 from core.storage import close_db, init_db
 from core.orchestration_service import (
@@ -69,6 +76,11 @@ class NumberTests(unittest.TestCase):
             setattr(f, f"p{i}_number", num)
         pools = configured_pools(f)
         self.assertEqual(validate_live_pools(pools), [])
+        self.assertEqual(
+            pools[NumberPool.SANDBOX1_DIGITAL],
+            ("+91C",),
+            "P3 must expose exactly one Digital Leads calling slot",
+        )
 
     def test_missing_digital_sandbox_is_fail_closed(self):
         class JustCold:
@@ -151,6 +163,79 @@ class QueueTests(unittest.TestCase):
             self.assertIsNotNone(job)
             self.assertTrue(complete_job(c, job["id"], job["claim_token"]))
             self.assertIsNone(claim_next(c, eligible_pool="sandbox1_callback", number="P2", now=2))
+        finally:
+            c.close()
+
+    def test_transient_capacity_result_requeues_instead_of_completing(self):
+        c = self.conn()
+        now = datetime(2026, 8, 19, 12, 0, tzinfo=ZoneInfo("Asia/Kolkata")).timestamp()
+        create_job(
+            c,
+            lead_id=1,
+            job_type="fresh_call",
+            priority=6,
+            due_at_utc=now,
+            eligible_pool="sandbox1_digital",
+            idempotency_key="digital:transient",
+        )
+        calls = []
+
+        async def phone(job, number):
+            calls.append((job["lead_id"], number))
+            return {
+                "answered": False,
+                "retryable": True,
+                "retry_after_sec": 1,
+                "error": "Line busy",
+            }
+
+        async def wa(job, number):
+            return None
+
+        try:
+            job = asyncio.run(
+                dispatch_once(
+                    c,
+                    pools={NumberPool.SANDBOX1_DIGITAL: ("P3",)},
+                    busy_numbers={},
+                    phone_executor=phone,
+                    whatsapp_executor=wa,
+                    now=now,
+                )
+            )
+            self.assertEqual(job["dispatch_status"], "deferred")
+            row = c.execute(
+                "SELECT status,claim_token,claimed_by_number FROM workflow_jobs WHERE idempotency_key='digital:transient'"
+            ).fetchone()
+            self.assertEqual(row["status"], "scheduled")
+            self.assertIsNone(row["claim_token"])
+            self.assertIsNone(row["claimed_by_number"])
+            self.assertEqual(calls, [(1, "P3")])
+            self.assertEqual(c.execute("SELECT status FROM leads WHERE id=1").fetchone()[0], "pending")
+        finally:
+            c.close()
+
+    def test_completed_pending_job_is_recovered(self):
+        c = self.conn()
+        try:
+            job_id = create_job(
+                c,
+                lead_id=1,
+                job_type="fresh_call",
+                priority=6,
+                due_at_utc=1,
+                eligible_pool="sandbox1_digital",
+                idempotency_key="digital:stuck",
+            )
+            c.execute("UPDATE workflow_jobs SET status='completed' WHERE id=?", (job_id,))
+            c.execute("UPDATE leads SET status='pending' WHERE id=1")
+            c.commit()
+            self.assertEqual(recover_completed_pending_phone_jobs(c), 1)
+            row = c.execute(
+                "SELECT status,error FROM workflow_jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            self.assertEqual(row["status"], "scheduled")
+            self.assertEqual(row["error"], "Recovered incomplete dispatch")
         finally:
             c.close()
 

@@ -70,6 +70,15 @@ def _unclaim(conn: sqlite3.Connection, job_id: int, token: str | None = None) ->
             updated_at=datetime('now') WHERE id=?""",
             (job_id,),
         )
+    # claim_next marks the lead dialing inside the same transaction. If the
+    # physical line loses the capacity race, undo that display state together
+    # with the claim so the dashboard never shows a call that was not placed.
+    conn.execute(
+        """UPDATE leads SET status='pending',updated_at=datetime('now')
+        WHERE id=(SELECT lead_id FROM workflow_jobs WHERE id=?)
+          AND lower(COALESCE(status,'pending'))='dialing'""",
+        (job_id,),
+    )
 
 
 def claim_next(
@@ -197,6 +206,76 @@ def complete_job(conn: sqlite3.Connection, job_id: int, claim_token: str) -> boo
     )
     conn.commit()
     return cur.rowcount == 1
+
+
+def defer_job(
+    conn: sqlite3.Connection,
+    job_id: int,
+    claim_token: str,
+    *,
+    delay_seconds: float = 1.0,
+    reason: str = "Dialing capacity temporarily unavailable",
+) -> bool:
+    """Return a transiently blocked job to the runnable queue.
+
+    A carrier/line-capacity miss is not a completed call attempt. Keeping the
+    same job and idempotency key prevents duplicate rows while guaranteeing the
+    next dispatcher cycle can try the lead again.
+    """
+    due_at = time.time() + max(0.25, float(delay_seconds))
+    cur = conn.execute(
+        """UPDATE workflow_jobs SET status='scheduled',due_at_utc=?,error=?,
+        claim_token=NULL,claimed_by_number=NULL,claimed_at=NULL,lease_expires_at=NULL,
+        updated_at=datetime('now')
+        WHERE id=? AND claim_token=? AND status IN ('claimed','running')""",
+        (due_at, reason[:1000], job_id, claim_token),
+    )
+    if cur.rowcount:
+        conn.execute(
+            "UPDATE leads SET status='pending',updated_at=datetime('now') WHERE id=(SELECT lead_id FROM workflow_jobs WHERE id=?)",
+            (job_id,),
+        )
+    conn.commit()
+    return cur.rowcount == 1
+
+
+def recover_completed_pending_phone_jobs(conn: sqlite3.Connection) -> int:
+    """Repair jobs incorrectly completed before a phone call was dispatched.
+
+    Older builds completed a workflow job even when the worker reported a
+    transient ``Line busy``/carrier-capacity result and reset the lead to
+    ``pending``. Those rows had no active job left and could never be dialed.
+    This startup repair safely requeues only pending/dialing phone leads that
+    have no other active workflow job.
+    """
+    now = time.time()
+    rows = conn.execute(
+        """SELECT j.id,j.lead_id FROM workflow_jobs j
+        JOIN leads l ON l.id=j.lead_id
+        WHERE j.status='completed'
+          AND j.job_type IN ('fresh_call','failed_retry')
+          AND lower(COALESCE(l.status,'pending')) IN ('pending','dialing')
+          AND NOT EXISTS (
+            SELECT 1 FROM workflow_jobs x
+            WHERE x.lead_id=j.lead_id
+              AND x.status IN ('scheduled','ready','claimed','running')
+          )
+          AND j.id=(SELECT MAX(j2.id) FROM workflow_jobs j2 WHERE j2.lead_id=j.lead_id)"""
+    ).fetchall()
+    for job_id, lead_id in rows:
+        conn.execute(
+            """UPDATE workflow_jobs SET status='scheduled',due_at_utc=?,
+            error='Recovered incomplete dispatch',claim_token=NULL,
+            claimed_by_number=NULL,claimed_at=NULL,lease_expires_at=NULL,
+            updated_at=datetime('now') WHERE id=? AND status='completed'""",
+            (now, int(job_id)),
+        )
+        conn.execute(
+            "UPDATE leads SET status='pending',updated_at=datetime('now') WHERE id=?",
+            (int(lead_id),),
+        )
+    conn.commit()
+    return len(rows)
 
 
 def fail_job(conn: sqlite3.Connection, job_id: int, claim_token: str, error: str) -> bool:

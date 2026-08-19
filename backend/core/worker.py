@@ -855,7 +855,13 @@ async def _process_single_lead(
         if phone_is_busy(v_from):
             await update_lead_status(lead_id, "pending")
             _CAMPAIGN_DATA.pop(call_id, None)
-            return {"answered": False, "call_id": call_id, "error": "Line busy"}
+            return {
+                "answered": False,
+                "call_id": call_id,
+                "error": "Line busy",
+                "retryable": True,
+                "retry_after_sec": 1.0,
+            }
         acquire_phone_slot(v_from)
         phone_slot_held = True
 
@@ -864,7 +870,13 @@ async def _process_single_lead(
 
         if not acquire_vobiz_call_slot(role):
             await update_lead_status(lead_id, "pending")
-            return {"answered": False, "call_id": call_id, "error": "Vobiz concurrent cap"}
+            return {
+                "answered": False,
+                "call_id": call_id,
+                "error": "Vobiz concurrent cap",
+                "retryable": True,
+                "retry_after_sec": 2.0,
+            }
 
         slot_acquired = True
         logger.info(
