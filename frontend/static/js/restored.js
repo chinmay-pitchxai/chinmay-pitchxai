@@ -2737,33 +2737,13 @@ async function loadHealthAgents() {
         if (!res.ok) throw new Error('Failed to load agents');
         const data = await res.json();
         const agents = Array.isArray(data.agents) ? data.agents : [];
-        const boss = data.boss || null;
         const overall = data.overall_health || 'ok';
         if (badge) {
             badge.textContent = overall.toUpperCase();
             badge.className = 'badge-tag ' + (overall === 'ok' ? 'badge-tag-success' : overall === 'critical' ? 'badge-tag-danger' : 'badge-tag-warning');
         }
         const cards = [];
-        if (boss && boss.agent_id) {
-            const bh = (boss.health || 'ok').toLowerCase();
-            const bcolor = bh === 'ok' ? 'var(--success)' : bh === 'critical' ? 'var(--danger)' : 'var(--warning)';
-            const childNote = (boss.children_monitored != null)
-                ? `Watching ${boss.children_monitored} agents · ${boss.children_critical || 0} critical · ${boss.children_warn || 0} warn`
-                : 'Parent supervisor';
-            const decision = boss.last_decision_detail || boss.last_decision || '';
-            cards.push(`<div style="grid-column:1/-1;border:2px solid var(--primary);border-radius:10px;padding:12px 14px;background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(16,185,129,.06));">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                    <div>
-                        <div style="font-weight:800;font-size:13px;">👑 ${escapeHtml(boss.agent_name || 'Super Boss')}</div>
-                        <div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">Parent Supervisor</div>
-                    </div>
-                    <div style="font-size:11px;color:${bcolor};font-weight:700;">${bh.toUpperCase()}</div>
-                </div>
-                <div style="font-size:11px;color:var(--text-secondary);margin-top:8px;line-height:1.4;">${escapeHtml(childNote)}</div>
-                ${decision ? `<div style="font-size:10px;color:var(--text-secondary);margin-top:6px;font-style:italic;">${escapeHtml(decision)}</div>` : ''}
-            </div>`);
-        }
-        if (!agents.length && !cards.length) {
+        if (!agents.length) {
             listEl.innerHTML = '<div style="color:var(--text-secondary);">No agents running.</div>';
             return;
         }

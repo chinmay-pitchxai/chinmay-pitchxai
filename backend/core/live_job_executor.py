@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from core.storage import _get_conn
 
 
-async def execute_phone_job(job: dict, number: str | None) -> None:
+async def execute_phone_job(job: dict, number: str | None) -> dict:
     if not number:
         raise RuntimeError("Phone workflow job has no eligible DID")
     conn = _get_conn()
@@ -21,11 +21,16 @@ async def execute_phone_job(job: dict, number: str | None) -> None:
     result = await _process_single_lead(
         role, lead, number, external_managed=True, orchestration_job=job,
     )
-    if not (result or {}).get("answered") and job["job_type"] not in ("fresh_call", "failed_retry"):
+    if (
+        not (result or {}).get("answered")
+        and not (result or {}).get("retryable")
+        and job["job_type"] not in ("fresh_call", "failed_retry")
+    ):
         from core.orchestration_service import relationship_no_answer
         relationship_no_answer(
             conn, job=job, source=role, ended_at=datetime.now(timezone.utc),
         )
+    return result or {}
 
 
 async def execute_whatsapp_job(job: dict, _number: str | None) -> None:

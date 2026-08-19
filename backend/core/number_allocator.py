@@ -55,8 +55,8 @@ def allocate_number(pool: NumberPool | str, busy: Iterable[str] = (), pools=None
     ``busy`` may be a set of busy numbers (legacy, one slot per number) or a
     dict mapping number -> active call count. When a dict is given, a number
     is free while its active count is below how many times it appears in the
-    pool tuple — that is how the digital sub-sandbox allows 2 concurrent
-    calls on a single P3 line (pool tuple ``(P3, P3)``).
+    pool tuple. Digital Leads intentionally registers P3 once so uploaded
+    leads dial sequentially, one after another.
     """
     pool = NumberPool(pool)
     pool_lines = (pools or DEFAULT_POOLS).get(pool, ())
@@ -66,7 +66,6 @@ def allocate_number(pool: NumberPool | str, busy: Iterable[str] = (), pools=None
             if not n:
                 continue
             # Capacity = how many times this number appears in the pool tuple.
-            # P3 registered twice in SANDBOX1_DIGITAL => 2 concurrent calls.
             capacity = sum(1 for x in pool_lines if x == n)
             if int(busy.get(str(n), 0)) < capacity:
                 return n
@@ -103,11 +102,9 @@ def configured_pools(settings_obj=None) -> dict[NumberPool, tuple[str, ...]]:
 
     return {
         NumberPool.SANDBOX1_FRESH: lines(1, 2),
-        # Digital sub-sandbox supports 2 CONCURRENT calls on P3 (the same
-        # physical line is registered twice so the dispatcher's busy-number
-        # tracking allows two simultaneous digital dials — plan: "2 concurrency
-        # calls, from P3 make call to 2 leads").
-        NumberPool.SANDBOX1_DIGITAL: lines(3, 3),
+        # Digital Leads are strictly sequential: one active call on P3, then
+        # the next queued lead is claimed after that call finishes.
+        NumberPool.SANDBOX1_DIGITAL: lines(3),
         NumberPool.SANDBOX1_CALLBACK: lines(1, 2, 3),
         NumberPool.SANDBOX2_RETRY_2: lines(4),
         NumberPool.SANDBOX2_RETRY_3_COLD: lines(5),
@@ -151,10 +148,8 @@ def validate_live_pools(pools=None, *, allow_shared_test_numbers: bool | None = 
             continue
         for number in numbers:
             if number in owners:
-                # Duplicate within the SAME pool is intentional: it is the
-                # concurrency slot for that pool (e.g. SANDBOX1_DIGITAL lists
-                # P3 twice to allow 2 simultaneous digital calls). Only a
-                # number shared by two DIFFERENT pools is an error.
+                # A duplicate within the same pool is a configured concurrency
+                # slot. Only a number shared by different pools is an error.
                 if owners[number] is not pool:
                     errors.append(f"Number {number} must be different; used by {owners[number].value} and {pool.value}")
             else:

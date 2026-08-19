@@ -106,7 +106,6 @@
 |---|---|---|
 | `ops_events` | Event bus + `/ws/dashboard` + `/api/events/stream` live push | `core/events.py`, `routes/events.py` |
 | `ops_health` | 10 self-healing agents (call quality, callback, campaign, concurrency, config, integration, media, RAG, scheduling, smooth calls) | `services/health_agents/` |
-| `ops_boss` | Super Boss parent supervisor + Panther auto-fix loop | `services/supervisor/` |
 | `ops_watchdog` | Hermes watchdog — 5-min cron, VPS sensor script + Windows SSH runner, safe fixes, TTS alert | `watchdog/` |
 | `ops_deploy` | tar+scp → `docker compose build && up -d`; Caddy TLS/WSS | `deploy_vps.sh`, `docker-compose.yml`, `Caddyfile`, `Dockerfile` |
 
@@ -158,4 +157,4 @@
 1. Code is **not a git repo on the VPS** — sync via `tar + scp` (excludes `.env`, `backend/data`, `backend/openwa`, `.venv`, `node_modules`).
 2. `deploy_vps.sh` on the VPS: pins VOBIZ_PUBLIC_BASE_URL / VOBIZ_STREAM_PUBLIC_BASE_URL / SERVER_URL → `docker compose down` → `build` → `up -d` → probes `/vobiz/answer` internally + over public HTTPS.
 3. Caddy terminates TLS/WSS, reverse-proxies `technopoliss:9090`.
-4. Self-healing: 10 health agents + Super Boss + Panther auto-fix loop; Hermes watchdog cron (every 5 min) SSH-checks VPS, restarts containers only when `active_calls=0`, prunes docker on disk >85%, announces via TTS.
+4. Self-healing: health agents perform safe checks and guarded fixes; Hermes watchdog cron (every 5 min) SSH-checks VPS, restarts containers only when `active_calls=0`, prunes Docker on disk >85%, and announces via TTS.

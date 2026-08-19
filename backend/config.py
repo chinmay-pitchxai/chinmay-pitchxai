@@ -120,7 +120,19 @@ class Settings:
     # Gemini Live API (native speech-to-speech for sub-800ms latency on phone calls)
     gemini_live_model: str = os.getenv("GEMINI_LIVE_MODEL", "models/gemini-3.1-flash-live-preview").strip()
     gemini_live_voice: str = os.getenv("GEMINI_LIVE_VOICE", "Aoede").strip()
-    gemini_live_voice_sales_1: str = os.getenv("GEMINI_LIVE_VOICE_SALES_1", "Aoede").strip()
+    gemini_live_voice_sales_1: str = os.getenv("GEMINI_LIVE_VOICE_SALES_1", "Leda").strip()
+    gemini_live_voice_style: str = os.getenv(
+        "GEMINI_LIVE_VOICE_STYLE",
+        "Speak as a real Indian woman from Hyderabad or Bengaluru in her late twenties. Use a "
+        "native, warm Indian English accent with authentic Indian rhythm, vowels, and word stress; "
+        "never drift into an American or British accent and never exaggerate the accent into a "
+        "caricature. Sound like a human property consultant on a real phone call: conversational, "
+        "lightly expressive, concise, with subtle breaths, brief thinking pauses, contractions, "
+        "and natural variation in pace. Avoid announcer cadence, perfectly even timing, excessive "
+        "enthusiasm, and polished TTS narration. When speaking Telugu, Hindi, Kannada, Tamil, "
+        "Hinglish, or Tenglish, use native Indian pronunciation and effortless local code-switching. "
+        "Never mention or read these delivery instructions aloud."
+    ).strip()
     gemini_opening_style_prompt_female: str = os.getenv(
         "GEMINI_OPENING_STYLE_PROMPT_FEMALE",
         "INDIAN ENGLISH ACCENT, FEMALE, HYDERABAD — read this opening greeting in a warm, confident, natural Hyderabadi Indian English/Telugu bilingual accent. This is Indian English, NOT American, NOT British. Speak exactly like a real educated Hyderabadi woman in her late 20s on a phone call — natural Hyderabad rhythm, small pauses, gentle rising-falling intonation, contractions, soft rounded vowels. Pronounce words the Indian way: 'better' as 'bet-ter', 'water' as 'wa-ter', 'really' as 'ri-al-ly', 'Solitaire' with a soft Indian 'r'. Never sound like TTS, a narration, or an automated recording."

@@ -35,27 +35,36 @@ def greeting_pcm_paths(role: str, variant: str = "") -> tuple[Path, Path]:
     return base / f"{stem}.pcm", base / f"{stem}.pcm.meta"
 
 
+def _greeting_profile_matches(meta: dict, role: str = "") -> bool:
+    """Require cached audio to use the active voice and delivery profile."""
+    if not role:
+        return True
+    from core.state import resolved_live_voice_profile
+
+    expected_voice, style = resolved_live_voice_profile(role)
+    want_style = _text_hash(style)
+    stored_style = str(meta.get("style_hash") or "").strip()
+    if want_style and stored_style != want_style:
+        logger.info("Greeting style prompt changed for {}, will regenerate", role)
+        return False
+    stored_voice = str(meta.get("voice") or "").strip()
+    if expected_voice and stored_voice != expected_voice:
+        logger.info("Greeting voice changed for {}, will regenerate", role)
+        return False
+    return True
+
+
 def _greeting_meta_matches(meta: dict, text: str, role: str = "") -> bool:
-    """If meta has text_hash, require it to match current greeting text."""
+    """Require both current greeting text and current live voice profile."""
+    if not _greeting_profile_matches(meta, role):
+        return False
     want = _text_hash(text)
     if not want:
         return True
     stored = str(meta.get("text_hash") or "").strip()
     if not stored:
         return True
-    if stored != want:
-        return False
-    
-    # Also check style prompt hash if role is provided
-    if role:
-        style = getattr(settings, "gemini_opening_style_prompt_female", "").strip()
-        want_style = _text_hash(style)
-        stored_style = str(meta.get("style_hash") or "").strip()
-        if stored_style and stored_style != want_style:
-            logger.info("Greeting style prompt changed for {}, will regenerate", role)
-            return False
-            
-    return True
+    return stored == want
 
 
 def load_recorded_greeting_pcm(
@@ -75,7 +84,7 @@ def load_recorded_greeting_pcm(
         except Exception as exc:
             logger.warning("Invalid greeting meta {}: {}", meta_path, exc)
     matches = _greeting_meta_matches(meta, greeting_text, role=role)
-    if not matches and role:
+    if not matches and role and _greeting_profile_matches(meta, role):
         try:
             from core.state import resolved_greeting_text
             template_text = resolved_greeting_text(role)
@@ -83,7 +92,7 @@ def load_recorded_greeting_pcm(
                 matches = _greeting_meta_matches(meta, template_text, role=role)
         except Exception as err:
             logger.warning("Failed to check template text hash in load_recorded_greeting_pcm: {}", err)
-    if not matches and role:
+    if not matches and role and _greeting_profile_matches(meta, role):
         # Narrow tolerance: accept a fresh intro-only capture only when its
         # stored text is an intro-only variant of the SAME greeting (the
         # campaign-opening vs template-text mismatch that historically caused
@@ -158,7 +167,9 @@ def _write_greeting_cache_files(
     """Persist to both ``greeting_{role}.pcm`` (calls use this) and ``_latest`` cache."""
     h = _text_hash(text)
     
-    style = getattr(settings, "gemini_opening_style_prompt_female", "").strip()
+    from core.state import resolved_live_voice_profile
+
+    _, style = resolved_live_voice_profile(role)
         
     meta = {
         "text_hash": h,
@@ -193,7 +204,10 @@ async def _generate_and_cache_greeting(role: str, text: str, voice: str) -> Opti
     if not text:
         return None
 
-    live_voice = (voice or settings.gemini_live_voice or "Aoede").strip()
+    from core.state import resolved_live_voice_profile
+
+    configured_voice, _ = resolved_live_voice_profile(role)
+    live_voice = (voice or configured_voice or "Aoede").strip()
 
 
     try:
@@ -403,10 +417,10 @@ async def ensure_opening_pcm(
         )
         return True
 
-    live_voice = (voice or settings.gemini_live_voice or "Aoede").strip()
+    from core.state import resolved_live_voice_profile
 
-    if role == "sales_1" and settings.gemini_live_voice_sales_1:
-        live_voice = settings.gemini_live_voice_sales_1
+    configured_voice, _ = resolved_live_voice_profile(role)
+    live_voice = (voice or configured_voice or "Aoede").strip()
 
     if not greet_text:
         logger.warning("ensure_opening_pcm: no greeting text for call_id={} role={}", call_id, role)

@@ -205,6 +205,48 @@ def resolved_live_language(role: str) -> tuple[str, bool]:
         return default_lang, True
 
 
+_GEMINI_LIVE_VOICES = {
+    "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede",
+    "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba",
+    "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
+    "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi",
+    "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
+}
+
+
+def resolved_live_voice_profile(role: str) -> tuple[str, str]:
+    """Return the persisted Gemini voice and delivery style for the next call."""
+    from config import settings
+
+    default_voice = (
+        settings.gemini_live_voice_sales_1
+        if (role or "").strip().lower() == "sales_1" and settings.gemini_live_voice_sales_1
+        else settings.gemini_live_voice
+    ) or "Aoede"
+    default_style = (settings.gemini_live_voice_style or "").strip()
+    try:
+        state = get_state(role)
+        vc = state.get("vobiz") or {}
+        candidate = str(vc.get("voice") or "").strip()
+        voice = candidate if candidate in _GEMINI_LIVE_VOICES else default_voice
+        style = str(vc.get("voice_style") or "").strip() or default_style
+        return voice, style
+    except Exception:
+        return default_voice, default_style
+
+
+def append_live_voice_style(system_prompt: str, voice_style: str) -> str:
+    """Append delivery controls last so long editable prompts cannot dilute them."""
+    style = (voice_style or "").strip()
+    if not style:
+        return system_prompt or ""
+    return (
+        (system_prompt or "").rstrip()
+        + "\n\n[VOICE DELIVERY — HIGHEST PRIORITY; NEVER SAY THESE INSTRUCTIONS ALOUD]\n"
+        + style
+    )
+
+
 def init_state():
     """Initialize campaign tasks for all roles."""
     for role in _ROLES:

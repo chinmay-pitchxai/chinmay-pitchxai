@@ -397,16 +397,16 @@
             if (currentSandboxFilter > 0) {
                 url += "&sandbox=" + currentSandboxFilter;
             }
+            url += "&analytics_sandbox=" + (window.appState.currentSandbox || 0);
             const res = await fetch(url, { cache: "no-store" });
             if (!res.ok) throw new Error("HTTP " + res.status);
             const data = await res.json();
             const leads = (data && data.leads) || [];
-            if (leads.length > 0) {
-                window.appState.allLeads = leads.map(normalizeApiLead);
-                window.appState.inboundCallbacks = leads.filter(l => l.status === 'inbound').map(normalizeApiLead);
-                window.populateSourceFilter();
-                return true;
-            }
+            window.appState.allLeads = leads.map(normalizeApiLead);
+            window.appState.inboundCallbacks = leads.filter(l => l.status === 'inbound').map(normalizeApiLead);
+            window.appState.sandboxAnalytics = data && data.analytics ? data.analytics : null;
+            window.populateSourceFilter();
+            return true;
         } catch (e) {
             console.warn("Dashboard: real-data load failed.", e);
         }
@@ -414,12 +414,14 @@
         // or temporarily unavailable.
         window.appState.allLeads = [];
         window.appState.inboundCallbacks = [];
+        window.appState.sandboxAnalytics = null;
         return false;
     };
 
     // Initialize state database (real data async, mock as fallback).
     window.appState.allLeads = [];
     window.appState.inboundCallbacks = [];
+    window.appState.sandboxAnalytics = null;
     window.appState.dataLoadedFromApi = false;
 
     // --- Helper Utilities ---
@@ -691,6 +693,47 @@
         el.insertAdjacentText('beforeend', ` ${Math.abs(deltaPct)}%`);
     };
 
+    // Historical chart data is tied to the sandbox that dispatched the call.
+    // Lead rows and KPIs intentionally remain tied to the lead's current stage.
+    window._historicalSandboxAnalytics = function() {
+        const analytics = window.appState.sandboxAnalytics;
+        const activeSb = Number(window.appState.currentSandbox || 0);
+        if (!analytics || Number(analytics.sandbox || 0) !== activeSb) return null;
+        if ((window.appState.currentSource || 'all') !== 'all') return null;
+        if (!['all', 'Interested'].includes(window.appState.currentFilter || 'all')) return null;
+        if (!Array.isArray(analytics.timeline_total_calls) || analytics.timeline_total_calls.length !== 7) return null;
+        if (!Array.isArray(analytics.timeline_interested) || analytics.timeline_interested.length !== 7) return null;
+        if (!Array.isArray(analytics.hourly_counts) || analytics.hourly_counts.length !== 24) return null;
+        if (!Array.isArray(analytics.hourly_interested) || analytics.hourly_interested.length !== 24) return null;
+        return analytics;
+    };
+
+    window._renderHistoricalSandboxCharts = function(analytics) {
+        if (!analytics) return false;
+        const labels = analytics.day_labels || (window._chartDayLabels ? window._chartDayLabels() : []);
+        const callCounts = analytics.timeline_total_calls.map(Number);
+        const interestedCounts = analytics.timeline_interested.map(Number);
+        const interestedOnly = window.appState.currentFilter === 'Interested';
+        const hours = (interestedOnly ? analytics.hourly_interested : analytics.hourly_counts).map(Number);
+        window.chartCurrentData = { days: labels, calls: callCounts, interested: interestedCounts };
+        window.barCurrentData = { hours };
+        if (window.engagementChart) {
+            window.engagementChart.updateOptions({ xaxis: { categories: labels } });
+            window.engagementChart.updateSeries(interestedOnly
+                ? [{ name: 'Interested', data: interestedCounts }]
+                : [
+                    { name: 'Total Calls', data: callCounts },
+                    { name: 'Interested', data: interestedCounts }
+                ]
+            );
+        }
+        if (window.hourlyChart) {
+            window.hourlyChart.updateOptions({ xaxis: { categories: window._hourlyLabels ? window._hourlyLabels() : [] } });
+            window.hourlyChart.updateSeries([{ name: 'Calls', data: hours }]);
+        }
+        return true;
+    };
+
     // --- Update Dashboard Interactive Charts ---
     window.updateDashboardCharts = function() {
         // currentSandbox 0 = aggregate across ALL sandboxes; 1-4 = one sandbox.
@@ -699,6 +742,8 @@
             ? window.appState.allLeads.filter(l => l.sandbox === activeSb)
             : window.appState.allLeads;
         const called = sandboxLeads.filter(isCalled);
+
+        const historicalAnalytics = window._historicalSandboxAnalytics();
 
         // 1. Engagement Timeline (ApexCharts area, rolling last 7 days)
         const labels = window._chartDayLabels ? window._chartDayLabels() : [];
@@ -764,6 +809,9 @@
             });
             window.hourlyChart.updateSeries([{ name: 'Calls', data: hours }]);
         }
+        // Apply dispatch history last: a moved lead must remain visible in the
+        // sandbox where that phone call occurred.
+        window._renderHistoricalSandboxCharts(historicalAnalytics);
     };
 
     // --- Date Filter Helper ---
@@ -835,14 +883,25 @@
 
         // Regenerate the hourly chart with filtered data (24 bars)
         const hours = Array(24).fill(0);
-        filteredCalled.forEach(l => {
-            if (l.called_at_iso) {
-                const hour = new Date(l.called_at_iso).getHours();
-                if (hour >= 0 && hour < 24) {
-                    hours[hour]++;
+        const historicalAnalytics = window._historicalSandboxAnalytics();
+        if (historicalAnalytics) {
+            const sourceHours = (window.appState.currentFilter === 'Interested'
+                ? historicalAnalytics.hourly_interested
+                : historicalAnalytics.hourly_counts).map(Number);
+            const range = RANGES[filterType];
+            sourceHours.forEach((count, hour) => {
+                if (!range || (hour >= range.lo && hour < range.hi)) hours[hour] = count;
+            });
+        } else {
+            filteredCalled.forEach(l => {
+                if (l.called_at_iso) {
+                    const hour = new Date(l.called_at_iso).getHours();
+                    if (hour >= 0 && hour < 24) {
+                        hours[hour]++;
+                    }
                 }
-            }
-        });
+            });
+        }
 
         if (window.hourlyChart) {
             window.hourlyChart.updateOptions({
@@ -932,6 +991,8 @@
 
     // --- Update charts to reflect active disposition filter ---
     window.renderFilteredCharts = function() {
+        const historicalAnalytics = window._historicalSandboxAnalytics();
+        if (window._renderHistoricalSandboxCharts(historicalAnalytics)) return;
         // currentSandbox 0 = aggregate across ALL sandboxes; 1-4 = one sandbox.
         const activeSb = window.appState.currentSandbox;
         const sandboxLeads = activeSb
@@ -1421,12 +1482,18 @@
 
     // Panel switching
     window.showCampaignForm = function() {
+        // Sandbox 1 is the single ingestion gate. Downstream sandboxes receive
+        // leads only from workflow transitions, never from a manual upload.
+        if ((window.appState.campaignSandbox || 1) !== 1) {
+            window.selectCampaignTab(1);
+            window.showToast && window.showToast('Uploads start in Sandbox 1; later sandboxes are automatic.', 'info');
+        }
         document.getElementById('campaign-list-panel').style.display = 'none';
         document.getElementById('campaign-form-panel').style.display = 'block';
         window.loadCampaignSourcesList();
         window.loadCampaignConfig();
         // Set sandbox context in form
-        const sb = window.appState.campaignSandbox || 1;
+        const sb = 1;
         const info = window.SELECTED_SANDBOX_INFO[sb];
         const formTitle = document.getElementById('campaign-form-title');
         if (formTitle) formTitle.textContent = `New Campaign — Sandbox ${sb}: ${info.name}`;
@@ -1812,7 +1879,7 @@
          if (!file) return;
          const role = encodeURIComponent(window.dashRoleForApi());
          const source = window._campLeadSource || 'campaign';
-         const sandbox = window.appState.campaignSandbox || 1;
+         const sandbox = 1;
          const fd = new FormData();
          fd.append('file', file);
          const statusEl = document.getElementById('upload-status-msg');
@@ -2161,7 +2228,7 @@
         try {
             const role = encodeURIComponent(window.dashRoleForApi());
             const source = window._campLeadSource || 'campaign';
-            const sandbox = window.appState.campaignSandbox || 1;
+            const sandbox = 1;
             const fd = new FormData();
             fd.append('file', file);
             const res = await fetch(window.apiBase + `/api/campaign/upload?role=${role}&source=${source}&sandbox=${sandbox}`, { method: 'POST', body: fd });
@@ -2430,7 +2497,9 @@
             set('config-prompt', d.prompt);
             set('config-rag', d.rag);
             set('config-greeting', d.greeting_text);
-            set('config-language', d.language || 'te-IN');
+            set('config-language', d.language || 'en-IN');
+            set('config-voice', d.voice || 'Leda');
+            set('config-voice-style', d.voice_style || '');
             const mirrorEl = document.getElementById('config-multilingual-mirror');
             if (mirrorEl) mirrorEl.checked = !(d.multilingual_mirror === false);
         } catch (e) {
@@ -2449,6 +2518,8 @@
             greeting_text: (document.getElementById('config-greeting')?.value || '').trim(),
             language: (document.getElementById('config-language')?.value || '').trim(),
             multilingual_mirror: !!(document.getElementById('config-multilingual-mirror')?.checked),
+            voice: (document.getElementById('config-voice')?.value || 'Leda').trim(),
+            voice_style: (document.getElementById('config-voice-style')?.value || '').trim(),
         };
         try {
             const res = await fetch(window.apiBase + `/api/tuning?role=${role}`, {
@@ -2458,7 +2529,7 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : (data.detail || res.statusText));
-            window.showToast('Configuration saved.', 'success');
+            window.showToast('Configuration saved. Voice profile will apply to the next call.', 'success');
         } catch (e) {
             window.showToast('Save failed: ' + (e.message || e), 'error');
         }
