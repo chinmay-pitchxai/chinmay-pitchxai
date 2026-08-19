@@ -193,9 +193,6 @@ NODES = [
     ("ops_health", 410, 1740, 310, 84, "ops", "Health Agents",
      ["10 self-healing agents", "concurrency · media · RAG · scheduling…"],
      "services/health_agents/"),
-    ("ops_boss", 760, 1740, 310, 84, "ops", "Super Boss · Panther",
-     ["parent supervisor · auto-fix loop", "prompts · cleanup"],
-     "services/supervisor/"),
     ("ops_watchdog", 1110, 1740, 310, 84, "ops", "Hermes Watchdog (5-min cron)",
      ["VPS sensor script · SSH runner", "safe fixes · TTS alert"],
      "watchdog/"),
@@ -268,8 +265,6 @@ EDGES = [
     ("ops_events", "fe_dashboard", "WS push", "dashed"),
     ("api_auth", "api_campaign", "JWT guard", "security"),
     ("api_auth", "api_dashboard", "JWT guard", "security"),
-    ("ops_health", "ops_boss", "reports", "solid"),
-    ("ops_boss", "ops_health", "fixes", "dashed"),
     ("ops_watchdog", "ops_deploy", "SSH safe fixes", "dashed"),
     ("ops_deploy", "api_dashboard", "compose build+up", "dashed"),
 ]
@@ -522,7 +517,7 @@ def build_html() -> str:
   </ul></div>
   <div class="card"><h2>▶ Ops &amp; delivery</h2><ul>
     <li>Docker stack: technopoliss · openwa · postgres · caddy on VPS.</li>
-    <li>Self-healing: 10 health agents → Super Boss → Panther; Hermes watchdog cron.</li>
+    <li>Self-healing: health agents perform safe checks and guarded fixes; Hermes watchdog handles VPS recovery.</li>
     <li>Deploy: tar+scp → <span class="mono">docker compose build &amp;&amp; up -d</span> (frontend baked into image).</li>
   </ul></div>
 </div>

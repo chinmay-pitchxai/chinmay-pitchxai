@@ -157,15 +157,6 @@ start_container() {
   record_restart "$ct"
 }
 
-trigger_panther() {
-  if [ "$WATCHDOG_DRY_RUN" = "1" ]; then
-    log "WOULD trigger /health/panther"; return 0
-  fi
-  log "ACTION trigger_panther"
-  docker exec "$CT_BACKEND" curl -s --max-time 15 -X POST "${BACKEND_INTERNAL_URL}/health/panther" \
-    -H 'Content-Type: application/json' -d '{"triggered_by":"watchdog"}' >/dev/null 2>&1 || true
-}
-
 # restart the backend ONLY if no live call is active (empty count = unresponsive,
 # which means no live call can survive — restart freely). Returns 0 if restarted,
 # 1 if deferred.
@@ -174,7 +165,6 @@ restart_backend_safely() {
   ac=$(active_calls)
   if [ -n "$ac" ] && [ "$ac" -gt 0 ]; then
     log "DEFER restart backend ($reason) — ${ac} live call(s) active"
-    trigger_panther
     alert "ESCALATE" "backend needs restart (${reason}) but ${ac} live call(s) active — deferred"
     return 1
   fi
@@ -314,12 +304,7 @@ main() {
     reset_threshold backend_down
   else
     if reach_threshold backend_down 1; then
-      # prefer in-app first-aid before a hard restart (preserves live calls)
-      trigger_panther
-      sleep 5
-      if ! backend_curl "${BACKEND_INTERNAL_URL}/health" >/dev/null 2>&1; then
-        restart_backend_safely "health endpoint down"
-      fi
+      restart_backend_safely "health endpoint down"
     fi
   fi
 
@@ -328,7 +313,6 @@ main() {
     reset_threshold backend_data
   else
     if reach_threshold backend_data 2; then
-      trigger_panther
       if ! backend_curl "${BACKEND_INTERNAL_URL}/api/dashboard/leads?limit=1" >/dev/null 2>&1; then
         restart_backend_safely "data layer down"
       fi

@@ -25,7 +25,7 @@ class VoiceProfileTests(unittest.TestCase):
         with patch("core.state.get_state", return_value=state):
             voice, style = resolved_live_voice_profile("sales_1")
 
-        self.assertEqual(voice, "Aoede")
+        self.assertEqual(voice, "Leda")
         self.assertIn("Indian", style)
         self.assertIn("human", style.lower())
 

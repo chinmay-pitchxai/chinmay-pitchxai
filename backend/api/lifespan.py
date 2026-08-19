@@ -237,10 +237,8 @@ async def lifespan(app: FastAPI):
             logger.info("Sandbox 1.2 Google Sheets watcher started.")
 
     agents_task = None
-    boss_task = None
-    panther_task = None
     if settings.webhook_only_mode:
-        logger.info("WEBHOOK_ONLY_MODE — health agents and Super Boss disabled on this host.")
+        logger.info("WEBHOOK_ONLY_MODE — health agents disabled on this host.")
     else:
         try:
             from services.health_agents import start_health_agents
@@ -251,31 +249,6 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("Health agents startup skipped: {}", exc)
 
-        try:
-            from services.supervisor import start_super_boss
-
-            boss_task = await start_super_boss()
-            if boss_task:
-                logger.info("Super Boss parent supervisor started.")
-        except Exception as exc:
-            logger.warning("Super Boss startup skipped: {}", exc)
-
-        panther_task = None
-        try:
-            from services.supervisor.panther_mode import panther_background_loop
-
-            watch_sec = float(os.getenv("PANTHER_WATCH_INTERVAL_SEC", "0") or "0")
-            if watch_sec > 0 and os.getenv("PANTHER_AUTO_FIX_ENABLED", "true").strip().lower() in (
-                "1",
-                "true",
-                "yes",
-                "on",
-            ):
-                panther_task = asyncio.create_task(panther_background_loop())
-                logger.info("Panther auto-watch started (interval={}s)", watch_sec)
-        except Exception as exc:
-            logger.warning("Panther auto-watch startup skipped: {}", exc)
-
     logger.info("Bridge ready on {}:{}", settings.host, settings.port)
     yield
 
@@ -285,16 +258,6 @@ async def lifespan(app: FastAPI):
         await stop_health_agents()
     except Exception:
         pass
-    try:
-        from services.supervisor import stop_super_boss
-
-        await stop_super_boss()
-    except Exception:
-        pass
-    if boss_task and not boss_task.done():
-        boss_task.cancel()
-    if panther_task and not panther_task.done():
-        panther_task.cancel()
     if agents_task and not agents_task.done():
         agents_task.cancel()
 

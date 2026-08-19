@@ -29,28 +29,13 @@ def get_agent_status() -> dict[str, Any]:
             break
         if h == AgentHealth.WARN.value and overall == AgentHealth.OK.value:
             overall = AgentHealth.WARN.value
-    boss = _get_boss_status_safe()
-    boss_h = boss.get("health", "ok")
-    if boss_h == AgentHealth.CRITICAL.value:
-        overall = AgentHealth.CRITICAL.value
-    elif boss_h == AgentHealth.WARN.value and overall == AgentHealth.OK.value:
-        overall = AgentHealth.WARN.value
     return {
         "enabled": _agents_enabled(),
         "overall_health": overall,
         "active_calls": total_active_vobiz_calls(),
         "last_cycle_at": _LAST_CYCLE_AT,
         "agents": list(_AGENT_STATE.values()),
-        "boss": _get_boss_status_safe(),
     }
-
-
-def _get_boss_status_safe() -> dict:
-    try:
-        from services.supervisor import get_super_boss_status
-        return get_super_boss_status()
-    except Exception:
-        return {"agent_id": "super_boss", "health": "ok", "enabled": False}
 
 
 def _agents_enabled() -> bool:
@@ -72,9 +57,7 @@ async def _run_agent(agent: BaseHealthAgent) -> None:
         heal_result: Optional[AgentHealResult] = None
         should_heal = report.health != AgentHealth.OK and any(f.auto_healable for f in report.findings)
         if should_heal:
-            from services.supervisor.panther_mode import is_panther_mode_active
-            panther = is_panther_mode_active()
-            if panther or agent.heal_during_active_calls or total_active_vobiz_calls() == 0:
+            if agent.heal_during_active_calls or total_active_vobiz_calls() == 0:
                 heal_result = await agent.heal(report)
                 if heal_result.healed:
                     report = await agent.check()

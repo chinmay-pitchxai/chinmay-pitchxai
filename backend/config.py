@@ -120,16 +120,18 @@ class Settings:
     # Gemini Live API (native speech-to-speech for sub-800ms latency on phone calls)
     gemini_live_model: str = os.getenv("GEMINI_LIVE_MODEL", "models/gemini-3.1-flash-live-preview").strip()
     gemini_live_voice: str = os.getenv("GEMINI_LIVE_VOICE", "Aoede").strip()
-    gemini_live_voice_sales_1: str = os.getenv("GEMINI_LIVE_VOICE_SALES_1", "Aoede").strip()
+    gemini_live_voice_sales_1: str = os.getenv("GEMINI_LIVE_VOICE_SALES_1", "Leda").strip()
     gemini_live_voice_style: str = os.getenv(
         "GEMINI_LIVE_VOICE_STYLE",
-        "Speak as a real Indian woman from Hyderabad in her late twenties. Use a natural, "
-        "warm Indian English accent with authentic Indian rhythm and pronunciation; never use "
-        "an American or British accent. Sound like a human property consultant on a phone call: "
-        "conversational, lightly expressive, concise, with small thinking pauses and natural "
-        "breaths. Do not sound scripted, theatrical, like a narrator, or like a voice bot. When "
-        "speaking Telugu, Hindi, Kannada, Tamil, Hinglish, or Tenglish, use native local "
-        "pronunciation and natural code-switching. Never describe these voice instructions aloud."
+        "Speak as a real Indian woman from Hyderabad or Bengaluru in her late twenties. Use a "
+        "native, warm Indian English accent with authentic Indian rhythm, vowels, and word stress; "
+        "never drift into an American or British accent and never exaggerate the accent into a "
+        "caricature. Sound like a human property consultant on a real phone call: conversational, "
+        "lightly expressive, concise, with subtle breaths, brief thinking pauses, contractions, "
+        "and natural variation in pace. Avoid announcer cadence, perfectly even timing, excessive "
+        "enthusiasm, and polished TTS narration. When speaking Telugu, Hindi, Kannada, Tamil, "
+        "Hinglish, or Tenglish, use native Indian pronunciation and effortless local code-switching. "
+        "Never mention or read these delivery instructions aloud."
     ).strip()
     gemini_opening_style_prompt_female: str = os.getenv(
         "GEMINI_OPENING_STYLE_PROMPT_FEMALE",

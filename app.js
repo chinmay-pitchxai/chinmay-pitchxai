@@ -2498,7 +2498,7 @@
             set('config-rag', d.rag);
             set('config-greeting', d.greeting_text);
             set('config-language', d.language || 'en-IN');
-            set('config-voice', d.voice || 'Aoede');
+            set('config-voice', d.voice || 'Leda');
             set('config-voice-style', d.voice_style || '');
             const mirrorEl = document.getElementById('config-multilingual-mirror');
             if (mirrorEl) mirrorEl.checked = !(d.multilingual_mirror === false);
@@ -2518,7 +2518,7 @@
             greeting_text: (document.getElementById('config-greeting')?.value || '').trim(),
             language: (document.getElementById('config-language')?.value || '').trim(),
             multilingual_mirror: !!(document.getElementById('config-multilingual-mirror')?.checked),
-            voice: (document.getElementById('config-voice')?.value || 'Aoede').trim(),
+            voice: (document.getElementById('config-voice')?.value || 'Leda').trim(),
             voice_style: (document.getElementById('config-voice-style')?.value || '').trim(),
         };
         try {
