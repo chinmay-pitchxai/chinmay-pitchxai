@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from core.state import append_live_voice_style, resolved_live_voice_profile
@@ -35,18 +37,36 @@ class VoiceProfileTests(unittest.TestCase):
         self.assertIn("HIGHEST PRIORITY", result)
 
     def test_old_greeting_profile_cannot_pass_text_tolerance(self):
-        from core.greeting_pcm import _greeting_meta_matches
+        import json
+
+        from core.greeting_pcm import load_recorded_greeting_pcm
 
         old_meta = {
-            "text_hash": "legacy",
+            "text_hash": "different-text-hash",
+            "text": "Hi, this is Vernika from Technopolis.",
             "style_hash": "old-style",
             "voice": "Aoede",
+            "intro_only": True,
+            "sr": 16000,
         }
-        with patch(
-            "core.state.resolved_live_voice_profile",
-            return_value=("Aoede", "New natural Indian human delivery"),
-        ):
-            self.assertFalse(_greeting_meta_matches(old_meta, "same greeting", "sales_1"))
+        with TemporaryDirectory() as tmp:
+            pcm_path = Path(tmp) / "greeting.pcm"
+            meta_path = Path(tmp) / "greeting.pcm.meta"
+            pcm_path.write_bytes(b"\x00\x00" * 100)
+            meta_path.write_text(json.dumps(old_meta), encoding="utf-8")
+            with (
+                patch("core.greeting_pcm.greeting_pcm_paths", return_value=(pcm_path, meta_path)),
+                patch(
+                    "core.state.resolved_live_voice_profile",
+                    return_value=("Aoede", "New natural Indian human delivery"),
+                ),
+            ):
+                result = load_recorded_greeting_pcm(
+                    "sales_1",
+                    greeting_text="Hi, this is Vernika from Technopolis.",
+                )
+
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

@@ -92,7 +92,7 @@ def load_recorded_greeting_pcm(
                 matches = _greeting_meta_matches(meta, template_text, role=role)
         except Exception as err:
             logger.warning("Failed to check template text hash in load_recorded_greeting_pcm: {}", err)
-    if not matches and role:
+    if not matches and role and _greeting_profile_matches(meta, role):
         # Narrow tolerance: accept a fresh intro-only capture only when its
         # stored text is an intro-only variant of the SAME greeting (the
         # campaign-opening vs template-text mismatch that historically caused
