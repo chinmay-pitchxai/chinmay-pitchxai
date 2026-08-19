@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query
 from loguru import logger
@@ -41,6 +43,18 @@ _DISPO_MAP = {
     "Site Visit": "Site Visit",
     "Site Visited": "Site Visit",
     "": "Pending",
+}
+
+_ANALYTICS_TIMEZONE = ZoneInfo("Asia/Kolkata")
+_PHONE_POOL_SANDBOX = {
+    "sandbox1_fresh": 1,
+    "sandbox1_digital": 1,
+    "sandbox1_callback": 1,
+    "sandbox2_retry_2": 2,
+    "sandbox2_retry_3_cold": 2,
+    "sandbox2_retry_3_digital": 2,
+    "sandbox3_nurture": 3,
+    "sandbox4_feedback": 4,
 }
 
 
@@ -336,9 +350,84 @@ def _fetch_leads(limit: int, role: str = "") -> list[dict]:
     return [_lead_payload(r) for r in rows]
 
 
+def _workflow_analytics(role: str, sandbox: int = 0) -> dict:
+    """Build call charts from immutable dispatch history, not current lead state.
+
+    A lead moves from Sandbox 1 to Sandbox 2/3 after its first outcome.  Using
+    ``leads.sandbox`` for charts therefore made the completed Sandbox 1 call
+    disappear.  A non-null workflow ``claimed_at`` records where and when the
+    phone call was actually dispatched, so it is the correct historical axis.
+    """
+    conn = _get_conn()
+    rows = conn.execute(
+        """SELECT j.lead_id,j.eligible_pool,j.claimed_at,l.analysis,l.status
+           FROM workflow_jobs j
+           JOIN leads l ON l.id=j.lead_id
+           WHERE l.role=? AND j.claimed_at IS NOT NULL
+           ORDER BY j.claimed_at ASC,j.id ASC""",
+        ((role or "sales_1").strip().lower(),),
+    ).fetchall()
+
+    now = datetime.now(_ANALYTICS_TIMEZONE)
+    today = now.date()
+    dates = [today - timedelta(days=offset) for offset in range(6, -1, -1)]
+    date_index = {value: idx for idx, value in enumerate(dates)}
+    calls = [0] * 7
+    interested = [0] * 7
+    hours = [0] * 24
+    interested_hours = [0] * 24
+
+    attempts: list[tuple[dict, int, datetime]] = []
+    latest_by_lead: dict[int, float] = {}
+    for raw in rows:
+        row = dict(raw)
+        attempt_sandbox = _PHONE_POOL_SANDBOX.get(str(row.get("eligible_pool") or ""))
+        if attempt_sandbox is None:
+            continue
+        try:
+            claimed_at = float(row.get("claimed_at") or 0)
+        except (TypeError, ValueError):
+            continue
+        if claimed_at <= 0:
+            continue
+        claimed_dt = datetime.fromtimestamp(claimed_at, _ANALYTICS_TIMEZONE)
+        lead_id = int(row["lead_id"])
+        latest_by_lead[lead_id] = max(latest_by_lead.get(lead_id, 0), claimed_at)
+        if not sandbox or attempt_sandbox == sandbox:
+            attempts.append((row, attempt_sandbox, claimed_dt))
+
+    for row, _attempt_sandbox, claimed_dt in attempts:
+        idx = date_index.get(claimed_dt.date())
+        if idx is None:
+            continue
+        calls[idx] += 1
+        hours[claimed_dt.hour] += 1
+        # The analysis blob describes the latest completed conversation.  Only
+        # attach that outcome to the latest phone attempt for this lead so it is
+        # never duplicated across historical sandboxes.
+        lead_id = int(row["lead_id"])
+        claimed_at = float(row["claimed_at"])
+        if claimed_at == latest_by_lead.get(lead_id) and _disposition(row) == "Interested":
+            interested[idx] += 1
+            interested_hours[claimed_dt.hour] += 1
+
+    return {
+        "sandbox": sandbox,
+        "timezone": "Asia/Kolkata",
+        "dates": [value.isoformat() for value in dates],
+        "day_labels": [value.strftime("%a") for value in dates],
+        "timeline_total_calls": calls,
+        "timeline_interested": interested,
+        "hourly_counts": hours,
+        "hourly_interested": interested_hours,
+        "total_calls": sum(calls),
+    }
+
+
 @router.get("/leads")
 async def dashboard_leads(
     sandbox: int = Query(0, ge=0, le=4),
+    analytics_sandbox: int = Query(0, ge=0, le=4),
     limit: int = Query(20000, ge=1, le=100000),
     role: str = Query(""),
     lead_source: str = Query(""),
@@ -354,7 +443,13 @@ async def dashboard_leads(
         ]
     if sandbox:
         leads = [l for l in leads if l["sandbox"] == sandbox]
-    return {"as_of": time.time(), "sandbox": sandbox, "count": len(leads), "leads": leads}
+    return {
+        "as_of": time.time(),
+        "sandbox": sandbox,
+        "count": len(leads),
+        "leads": leads,
+        "analytics": _workflow_analytics(role_key, analytics_sandbox),
+    }
 
 
 @router.get("/overview")
