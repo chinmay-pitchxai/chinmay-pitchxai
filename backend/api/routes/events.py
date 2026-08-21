@@ -161,8 +161,10 @@ async def dashboard_websocket(
 ):
     """WebSocket live feed for dashboard KPIs, lead updates, and upload progress."""
     jwt_role = _resolve_role_from_token(access_token or token)
-    if jwt_role:
-        role = jwt_role
+    if not jwt_role:
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+    role = jwt_role
     await websocket.accept()
     bus = get_event_bus()
     q = bus.subscribe()

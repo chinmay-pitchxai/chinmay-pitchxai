@@ -161,9 +161,18 @@ class SIPServer:
             self._transport.close()
 
     def get_public_ip(self) -> str:
-        if self.local_ip in ("0.0.0.0", "127.0.0.1"):
-            return "187.127.187.10"
-        return self.local_ip
+        import os
+        env_ip = os.getenv("SIP_PUBLIC_IP", "").strip()
+        if env_ip:
+            return env_ip
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
 
     def handle_invite(self, msg: dict, addr: tuple):
         call_id = msg["headers"].get("call-id", "")

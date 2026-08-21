@@ -28,6 +28,7 @@ fi
 # --- 2. Write the public HTTPS URL into the backend env -----------------------
 ENVF="$ROOT/backend/.env"
 if [ -f "$ENVF" ]; then
+  cp "$ENVF" "$ENVF.bak.$(date +%s)"
   for K in VOBIZ_PUBLIC_BASE_URL VOBIZ_STREAM_PUBLIC_BASE_URL SERVER_URL; do
     if grep -q "^${K}=" "$ENVF"; then
       sed -i "s|^${K}=.*|${K}=${PUB_URL}|" "$ENVF"
@@ -47,7 +48,14 @@ docker compose build
 docker compose up -d
 
 # --- 4. Verify the guard's probe target answer XML ----------------------------
-sleep 6
+echo "Waiting for startup..."
+for i in 1 2 3 4 5 6 7 8; do
+  if curl -sf http://localhost:9090/health > /dev/null 2>&1; then
+    echo "Backend is healthy"
+    break
+  fi
+  sleep 2
+done
 echo "---- direct (inside network) ----"
 curl -sf "http://localhost:9090/vobiz/answer?camp_id=deploy_probe&role=sales_1" | head -c 400; echo
 echo "---- public HTTPS ----"

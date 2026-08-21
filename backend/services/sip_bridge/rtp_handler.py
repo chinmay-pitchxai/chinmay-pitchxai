@@ -252,6 +252,8 @@ def _resample_16k_to_8k(pcm_16k: bytes) -> bytes:
 
 def _decode_g722(payload: bytes) -> bytes:
     """G.722 decode stub — returns silence (needs libg722 for real decode)."""
+    import logging
+    logging.warning("G.722 codec not implemented - audio will be silent. Configure μ-law/A-law on the SIP trunk.")
     samples = len(payload) * 4
     return b"\x00\x00" * samples
 
