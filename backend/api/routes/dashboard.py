@@ -106,24 +106,53 @@ def _analysis_payload(lead: dict) -> dict:
 
 def _display_status(lead: dict) -> str:
     """Expose the queue's live state instead of leaving queued leads pending."""
-    raw = str(lead.get("status") or "pending").strip().lower()
-    if raw not in ("", "pending"):
-        return raw
     workflow = str(lead.get("workflow_status") or "").strip().lower()
+    job_type = str(lead.get("workflow_job_type") or "").strip().lower()
+    attempt = int(lead.get("attempt_number") or 0)
+    sandbox = _sandbox_of(lead)
+
     if workflow in ("claimed", "running"):
-        return "dialing"
+        if job_type == "failed_retry" and sandbox == 2:
+            return f"Retry Attempt {attempt}" if attempt >= 2 else "Retry Dialing"
+        return "Dialing"
+
+    if workflow == "completed":
+        return "Processing"
+
+    if workflow in ("failed", "cancelled"):
+        if job_type == "failed_retry" and sandbox == 2:
+            return f"Retry Failed (Attempt {attempt})" if attempt >= 2 else "Retry Failed"
+        return "Failed" if workflow == "failed" else "Cancelled"
+
+    raw = str(lead.get("status") or "").strip().lower()
+    if raw in ("completed", "interested", "not_interested", "site_visit", "site_visited"):
+        return raw.replace("_", " ").title()
+    if raw in ("failed", "error"):
+        return "Failed"
+    if raw == "not_interested":
+        return "Not Interested"
+    if raw in ("callback_scheduled", "callback_completed"):
+        return "Callback"
+
     if workflow == "ready":
-        return "queued"
+        if sandbox == 2 and job_type == "failed_retry":
+            return "Retry Queued"
+        return "Queued"
+
     if workflow == "scheduled":
         try:
-            return "queued" if float(lead.get("workflow_due_at") or 0) <= time.time() else "scheduled"
+            if float(lead.get("workflow_due_at") or 0) <= time.time():
+                if sandbox == 2 and job_type == "failed_retry":
+                    return "Retry Queued"
+                return "Queued"
         except (TypeError, ValueError):
-            return "scheduled"
-    if workflow == "completed":
-        return "processing"
-    if workflow in ("failed", "cancelled"):
-        return workflow
-    return raw or "pending"
+            pass
+        return "Scheduled"
+
+    if raw:
+        return raw
+
+    return "Pending"
 
 
 def _sandbox_of(lead: dict) -> int:
@@ -135,21 +164,29 @@ def _sandbox_of(lead: dict) -> int:
       3 = Nurture & Site Visits (P7/P8 — interested leads from SB1+SB2)
       4 = Post-Visit Feedback (P9)
 
-    Rule: always use the explicit ``sandbox`` column stored in the database.
-    The sandbox column is updated by the worker when a lead transitions
-    between sandboxes (SB1→SB2 on failed call, SB1/SB2→SB3 on interested,
-    SB3→SB4 on site-visit completed).
-
-    Never derive sandbox from status/disposition heuristics — that causes
-    the same leads to appear in multiple sandbox views.
+    Priority:
+      1. Use the explicit ``sandbox`` column if present and valid.
+      2. Fall back to workflow_job_type-based mapping using the sandbox catalog.
+      3. Default to sandbox 1.
     """
     explicit = lead.get("sandbox")
     if explicit is not None:
         try:
-            return max(1, min(4, int(explicit)))
+            val = int(explicit)
+            if 1 <= val <= 4:
+                return val
         except (ValueError, TypeError):
             pass
-    # Absolute fallback: unclassified leads belong to Sandbox 1
+
+    job_type = str(lead.get("workflow_job_type") or "").strip().lower()
+    if job_type:
+        try:
+            from core.sandbox_catalog import sandbox_for_job
+            catalog_entry = sandbox_for_job(job_type)
+            return int(catalog_entry["sandbox"])
+        except Exception:
+            pass
+
     return 1
 
 

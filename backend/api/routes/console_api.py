@@ -38,6 +38,10 @@ def _role_from_jwt(request: Request) -> str | None:
     return None
 
 
+# NOTE: _role_from_jwt, _role_from_request, and extract_role below all resolve the
+# console role from different sources. Consider consolidating into a single function
+# to avoid subtle behavior differences (e.g. extract_role checks X-User-Role header
+# but _role_from_jwt does not). See _role_from_request for the most complete version.
 def _role_from_request(request: Request, default: str = "sales_1") -> str:
     """JWT role (all sandboxes resolve to the single Technopolis console role)."""
     from core.auth import console_role_from_request

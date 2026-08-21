@@ -46,6 +46,12 @@ Thumbs.db
 *.png
 screenshot.jpg
 
+# Watchdog
+watchdog/.hermes_watchdog_last.txt
+
+# Spreadsheets
+*.xlsx
+
 # Business documents (not for public repo)
 whatsapp details needs to shair/
 !backend/data/sales_1/rag_source.txt

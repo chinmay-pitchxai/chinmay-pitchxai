@@ -61,25 +61,21 @@ async def _connect_gemini_live(api_key: str, role: str = "sales_1"):
 
 
 def _pcm16k_to_24k(pcm_16k: bytes) -> bytes:
-    """Resample 16kHz 16-bit PCM to 24kHz."""
-    samples = []
-    for i in range(0, len(pcm_16k) - 1, 2):
-        s = struct.unpack("!h", pcm_16k[i:i + 2])[0]
-        samples.append(s)
-        if len(samples) % 3 == 0:
-            pass
+    """Convert 16kHz PCM to 24kHz using linear interpolation."""
+    samples_16k = struct.unpack(f"<{len(pcm_16k)//2}h", pcm_16k)
+    ratio = 24000 / 16000
+    num_out = int(len(samples_16k) * ratio)
+    samples_24k = []
+    for i in range(num_out):
+        pos = i / ratio
+        idx = int(pos)
+        frac = pos - idx
+        if idx + 1 < len(samples_16k):
+            val = samples_16k[idx] * (1 - frac) + samples_16k[idx + 1] * frac
         else:
-            idx = len(samples)
-            if idx % 3 == 1:
-                samples.append(s)
-    if not samples:
-        return pcm_16k
-    out = b""
-    for s in samples[: len(samples) // 3 * 3]:
-        out += struct.pack("!h", max(-32768, min(32767, s)))
-    if len(out) < 2:
-        out = b"\x00\x00"
-    return out
+            val = samples_16k[idx]
+        samples_24k.append(int(max(-32768, min(32767, val))))
+    return struct.pack(f"<{len(samples_24k)}h", *samples_24k)
 
 
 def _pcm24k_to_16k(pcm_24k: bytes) -> bytes:

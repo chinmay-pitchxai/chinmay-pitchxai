@@ -56,6 +56,7 @@ def _is_postgres(conn) -> bool:
 
 def _unclaim(conn: sqlite3.Connection, job_id: int, token: str | None = None) -> None:
     """Release a claimed job back to ``ready`` (same transaction as the caller)."""
+    lead_row = conn.execute("SELECT lead_id FROM workflow_jobs WHERE id=?", (job_id,)).fetchone()
     if token:
         conn.execute(
             """UPDATE workflow_jobs SET status='ready',claim_token=NULL,
@@ -69,6 +70,11 @@ def _unclaim(conn: sqlite3.Connection, job_id: int, token: str | None = None) ->
             claimed_by_number=NULL,claimed_at=NULL,lease_expires_at=NULL,
             updated_at=datetime('now') WHERE id=?""",
             (job_id,),
+        )
+    if lead_row:
+        conn.execute(
+            "UPDATE leads SET status='pending', lifecycle_status='new', updated_at=datetime('now') WHERE id=? AND status='dialing'",
+            (lead_row[0],),
         )
 
 
@@ -90,11 +96,20 @@ def claim_next(
                 " AND (l.first_called_at IS NULL OR l.first_called_at <= ?)\n"
             )
         # Recover abandoned claims before selecting.
+        abandoned_leads = conn.execute(
+            """SELECT lead_id FROM workflow_jobs
+            WHERE status IN ('claimed','running') AND lease_expires_at<?""", (now,)
+        ).fetchall()
         conn.execute(
             """UPDATE workflow_jobs SET status='ready',claim_token=NULL,
             claimed_by_number=NULL,claimed_at=NULL,lease_expires_at=NULL
             WHERE status IN ('claimed','running') AND lease_expires_at<?""", (now,)
         )
+        for (abandoned_lead_id,) in abandoned_leads:
+            conn.execute(
+                "UPDATE leads SET status='pending', lifecycle_status='new', updated_at=datetime('now') WHERE id=? AND status='dialing'",
+                (abandoned_lead_id,),
+            )
         if pg:
             # PostgreSQL: atomic job claim + lead lock. ``FOR UPDATE OF j, l
             # SKIP LOCKED`` (plan Phase 4) makes the claim race-free: a second
@@ -161,7 +176,7 @@ def claim_next(
         # write is idempotent and later corrected by the call outcome.
         try:
             conn.execute(
-                "UPDATE leads SET status='dialing', updated_at=datetime('now') WHERE id=? AND status IN ('pending','scheduled','ready')",
+                "UPDATE leads SET status='dialing', lifecycle_status='campaign_calling', updated_at=datetime('now') WHERE id=? AND status IN ('pending','scheduled','ready')",
                 (job["lead_id"],),
             )
         except Exception:
@@ -173,6 +188,10 @@ def claim_next(
             # claim and its line assignment stay atomic.
             final_number = number_resolver(conn, job)
             if not final_number:
+                conn.execute(
+                    "UPDATE leads SET status='pending', lifecycle_status='new', updated_at=datetime('now') WHERE id=? AND status='dialing'",
+                    (job["lead_id"],),
+                )
                 _unclaim(conn, job_id)
                 conn.commit()
                 return None

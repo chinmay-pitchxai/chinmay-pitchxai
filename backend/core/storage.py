@@ -1573,6 +1573,19 @@ def _update_lead_status_sync(lead_id: int, status: str, error: str = None, analy
     except Exception:
         pass
 
+    # Map status -> lifecycle_status so both columns stay in sync
+    _status_to_lifecycle = {
+        "pending": "new",
+        "dialing": "campaign_calling",
+        "completed": "connected",
+        "failed": "failed_retry_waiting",
+        "not_interested": "not_interested",
+        "interested": "interested",
+        "callback_scheduled": "callback_requested",
+        "site_visit": "site_visit_scheduled",
+    }
+    _lifecycle = _status_to_lifecycle.get(s_lower, s_lower)
+
     # When a lead is released back to 'pending' or starts 'dialing',
     # clear its call markers so it is NOT counted as "called" and doesn't
     # carry stale analysis/ratings from previous attempts.
@@ -1580,26 +1593,26 @@ def _update_lead_status_sync(lead_id: int, status: str, error: str = None, analy
     if analysis:
         if clear_on_pending:
             conn.execute(
-                "UPDATE leads SET status = ?, error = NULL, analysis = NULL, "
+                "UPDATE leads SET status = ?, lifecycle_status = ?, error = NULL, analysis = NULL, "
                 "start_time = NULL, _log_id = NULL, _call_id = NULL, updated_at = datetime('now') WHERE id = ?",
-                (status, lead_id),
+                (status, _lifecycle, lead_id),
             )
         else:
             conn.execute(
-                "UPDATE leads SET status = ?, error = ?, analysis = ?, updated_at = datetime('now') WHERE id = ?",
-                (status, error, json.dumps(analysis), lead_id)
+                "UPDATE leads SET status = ?, lifecycle_status = ?, error = ?, analysis = ?, updated_at = datetime('now') WHERE id = ?",
+                (status, _lifecycle, error, json.dumps(analysis), lead_id)
             )
     else:
         if clear_on_pending:
             conn.execute(
-                "UPDATE leads SET status = ?, error = NULL, analysis = NULL, start_time = NULL, "
+                "UPDATE leads SET status = ?, lifecycle_status = ?, error = NULL, analysis = NULL, start_time = NULL, "
                 "_log_id = NULL, _call_id = NULL, updated_at = datetime('now') WHERE id = ?",
-                (status, lead_id),
+                (status, _lifecycle, lead_id),
             )
         else:
             conn.execute(
-                "UPDATE leads SET status = ?, error = ?, updated_at = datetime('now') WHERE id = ?",
-                (status, error, lead_id)
+                "UPDATE leads SET status = ?, lifecycle_status = ?, error = ?, updated_at = datetime('now') WHERE id = ?",
+                (status, _lifecycle, error, lead_id)
             )
     
     # Cancel pending scheduled retries if resolved
@@ -2030,7 +2043,7 @@ async def reset_leads(role: str):
 
 def _reset_leads_sync(role: str):
     conn = _get_conn()
-    conn.execute("UPDATE leads SET status = 'pending', error = NULL, updated_at = datetime('now') WHERE role = ?", (role,))
+    conn.execute("UPDATE leads SET status = 'pending', lifecycle_status = 'new', error = NULL, extra = NULL, analysis = NULL, start_time = NULL, updated_at = datetime('now') WHERE role = ?", (role,))
     conn.commit()
     _invalidate_state_cache()
 
@@ -2182,7 +2195,7 @@ def _get_lead_counts_sync(role: str) -> dict:
         "SELECT status, COUNT(*) as count FROM leads WHERE role = ? GROUP BY status",
         (role,)
     ).fetchall()
-    counts = {"total": 0, "pending": 0, "dialing": 0, "completed": 0, "failed": 0, "not_interested": 0}
+    counts = {"total": 0, "pending": 0, "dialing": 0, "completed": 0, "failed": 0, "not_interested": 0, "interested": 0, "callback_scheduled": 0, "site_visit": 0, "busy": 0, "no_answer": 0, "error": 0, "dnc": 0}
     for row in rows:
         status = row["status"]
         count = row["count"]
@@ -4369,7 +4382,14 @@ def _mark_whatsapp_sent_sync(lead_id: int) -> None:
 # ── Failed Call Retry and WhatsApp Reminder Helpers ──────────────────
 
 async def update_lead_retry_state(lead_id: int, status: str, extra: dict, analysis: dict) -> None:
-    return await asyncio.to_thread(_update_lead_retry_state_sync, lead_id, status, extra, analysis)
+    await asyncio.to_thread(_update_lead_retry_state_sync, lead_id, status, extra, analysis)
+    try:
+        from core.events import get_event_bus
+        role = await get_lead_role(lead_id)
+        if role:
+            await get_event_bus().publish("lead_updated", role=role, lead_id=lead_id)
+    except Exception:
+        pass
 
 
 def _update_lead_retry_state_sync(lead_id: int, status: str, extra: dict, analysis: dict) -> None:

@@ -35,6 +35,10 @@ COPY index.html app.js index.css kpi_modal.js /app/
 # Data + writable dirs (bind-mounted from the host / named volume at runtime)
 RUN mkdir -p /app/backend/data
 
+# Non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 ENV HOST=0.0.0.0 \
     PORT=9090 \
     VERN_DATA_DIR=/app/backend/data

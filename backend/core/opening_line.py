@@ -10,7 +10,7 @@ _ROLE_FALLBACK_GREETINGS = {
     # interpolated from the operator's saved prompt (extract_agent_name), so
     # the AI never introduces itself with a stale hardcoded name.
     "sales_1": (
-        "Hi, this is {agent_name} from Technopolis Constructions Private Limited."
+        "Hi, this is {agent_name} from Technopolis Constructions. How are you doing today?"
     ),
 }
 
