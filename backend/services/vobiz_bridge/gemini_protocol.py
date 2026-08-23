@@ -139,7 +139,10 @@ def build_live_setup(
             ),
         },
         "systemInstruction": {
-            "parts": [{"text": system_instruction}],
+            "parts": [
+                {"text": system_instruction},
+                {"text": "Speak with a warm Indian English accent. Use occasional Hindi words naturally (haan, ji, accha, bilkul). Sound like a real Indian woman, not a robot."},
+            ],
         },
         "inputAudioTranscription": {},
         "outputAudioTranscription": {},

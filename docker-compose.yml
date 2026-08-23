@@ -21,6 +21,9 @@ x-backend-env: &backend-env
   DIGITAL_BROKER_1_PHONE: P3
   DIGITAL_BROKER_2_PHONE: P10
   DIGITAL_BROKER_3_PHONE: P11
+  # Gemini voice & language for Indian English
+  GEMINI_LIVE_VOICE: Kore
+  GEMINI_LIVE_LANGUAGE: en-IN
   # Gemini + Vobiz credentials and every runtime setting come from backend/.env
   ENV_FILE_GUARD: "1"
 
