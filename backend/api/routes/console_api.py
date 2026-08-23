@@ -368,7 +368,7 @@ async def get_tuning(request: Request):
     _lang, _mirror = resolved_live_language(role)
     result["language"] = _lang
     result["multilingual_mirror"] = _mirror
-    for i in range(1, 10):
+    for i in range(1, 12):
         result[f"p{i}_number"] = state.get(f"p{i}_number", "") or getattr(settings, f"p{i}_number", "") or ""
     return result
 
@@ -385,6 +385,8 @@ class TuningUpdate(BaseModel):
     p7_number: str = ""
     p8_number: str = ""
     p9_number: str = ""
+    p10_number: str = ""
+    p11_number: str = ""
     # Voice & language plug-and-play (mirrors Gemini Live languageCode + prompt)
     language: str = ""            # primary language code, e.g. "te-IN" (Telugu)
     multilingual_mirror: bool = True  # mirror the caller's language when different
@@ -447,9 +449,9 @@ async def update_tuning(data: TuningUpdate, request: Request):
         raise HTTPException(400, tuning_err)
 
     greeting_out = coerce_stored_greeting(role, greeting_val)
-    # Collect P1-P9 phone numbers from request
+    # Collect P1-P11 phone numbers from request
     phone_nums = {}
-    for i in range(1, 10):
+    for i in range(1, 12):
         val = getattr(data, f"p{i}_number", "") or ""
         phone_nums[f"p{i}_number"] = val.strip()
     save_role_state(role, prompt=prompt_val, rag=rag_val, greeting_text=greeting_out, **phone_nums)
@@ -962,7 +964,7 @@ async def get_vobiz_config(request: Request):
             and (settings.vobiz_sales_1_auth_token or "").strip()
         ),
     }
-    for i in range(1, 10):
+    for i in range(1, 12):
         result[f"p{i}_number"] = state.get(f"p{i}_number", "") or getattr(settings, f"p{i}_number", "") or ""
     return result
 

@@ -24,6 +24,20 @@ def live_orchestration_enabled() -> bool:
 _SUPERVISOR_TASK: "asyncio.Task | None" = None
 
 
+class _Supervisor:
+    """Manages immediate dispatch wake-up for new digital leads."""
+
+    def __init__(self):
+        self._immediate_dispatch_event = threading.Event()
+
+    def trigger_immediate_dispatch(self):
+        """Wake up dispatchers immediately for new digital leads."""
+        self._immediate_dispatch_event.set()
+
+
+_SUPERVISOR_INSTANCE: _Supervisor | None = None
+
+
 def register_supervisor_task(task: asyncio.Task) -> None:
     global _SUPERVISOR_TASK
     _SUPERVISOR_TASK = task
@@ -185,6 +199,8 @@ async def orchestration_supervisor() -> None:
     logger.info("Autonomous orchestration supervisor started in {} mode", status["mode"])
     if status["live_requested"] and not status["live_ready"]:
         logger.error("Live orchestration refused: {}", "; ".join(status["configuration_errors"]))
+    global _SUPERVISOR_INSTANCE
+    _SUPERVISOR_INSTANCE = _Supervisor()
     if status["mode"] == "live":
         from core.live_job_executor import execute_phone_job, execute_whatsapp_job
         from core.orchestration_dispatcher import dispatch_once
@@ -211,6 +227,10 @@ async def orchestration_supervisor() -> None:
                         raise
                     except Exception:
                         logger.exception("Dispatcher worker {} failed", worker_id)
+                    # Check for immediate dispatch or sleep normally
+                    if _SUPERVISOR_INSTANCE and _SUPERVISOR_INSTANCE._immediate_dispatch_event.is_set():
+                        _SUPERVISOR_INSTANCE._immediate_dispatch_event.clear()
+                        continue
                     await asyncio.sleep(0.25 if job else max(0.25, settings.orchestration_poll_seconds))
             finally:
                 conn.close()

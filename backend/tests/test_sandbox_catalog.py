@@ -16,11 +16,11 @@ from core.workflow_models import JobType, NumberPool
 
 
 class SandboxCatalogTests(unittest.TestCase):
-    def test_catalog_has_four_sandboxes_and_all_nine_lines(self):
+    def test_catalog_has_four_sandboxes_and_all_lines(self):
         catalog = load_sandbox_catalog()
         self.assertEqual([entry["sandbox"] for entry in catalog], [1, 2, 3, 4])
-        lines = [line for entry in catalog for line in entry["phone_lines"]]
-        self.assertEqual(lines, [f"P{i}" for i in range(1, 10)])
+        lines = {line for entry in catalog for line in entry["phone_lines"]}
+        self.assertEqual(lines, {f"P{i}" for i in range(1, 12)})
 
     def test_every_job_type_has_exactly_one_sandbox_owner(self):
         owners = {
@@ -40,6 +40,8 @@ class SandboxCatalogTests(unittest.TestCase):
         }
         self.assertEqual(set(DEFAULT_POOLS[NumberPool.SANDBOX1_FRESH]), {"P1", "P2"})
         self.assertEqual(set(DEFAULT_POOLS[NumberPool.SANDBOX1_DIGITAL]), {"P3"})
+        self.assertEqual(set(DEFAULT_POOLS[NumberPool.SANDBOX1_DIGITAL_2]), {"P10"})
+        self.assertEqual(set(DEFAULT_POOLS[NumberPool.SANDBOX1_DIGITAL_3]), {"P11"})
         self.assertEqual(
             set(DEFAULT_POOLS[NumberPool.SANDBOX2_RETRY_2])
             | set(DEFAULT_POOLS[NumberPool.SANDBOX2_RETRY_3_COLD])

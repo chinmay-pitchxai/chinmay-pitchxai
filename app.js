@@ -1387,7 +1387,7 @@
 
     // --- Sandbox tab switching ---
     window.SELECTED_SANDBOX_INFO = {
-        1: { name: 'First-Touch & Callbacks', desc: 'Sandbox 1.1: isolated cold upload on P1/P2 · Sandbox 1.2: automatic digital Excel feed on P3 · callbacks remain here', phones: '1.1 P1/P2 Cold · 1.2 P3 Digital', color: 'primary' },
+        1: { name: 'First-Touch & Callbacks', desc: 'Sandbox 1.2: Digital leads - Broker 1 (P3) · Broker 2 (P10) · Broker 3 (P11) - Fully automated', phones: '1.2 P3 Digital · Broker 1 (P3) · Broker 2 (P10) · Broker 3 (P11)', color: 'primary' },
         2: { name: 'Retry Engine', desc: 'Re-dial failed calls after +12hrs (P4) and +24hrs (P5/P6)', phones: 'P4, P5, P6', color: 'secondary' },
         3: { name: 'Nurture & Blue Loop', desc: 'Interested/site-visit leads: immediate WhatsApp · 24h nudge · P7/P8 call after 2–3h without reply · visit reminders', phones: 'P7, P8', color: 'tertiary' },
         4: { name: 'Post-Visit Feedback', desc: 'Feedback calls day after completed site visit', phones: 'P9', color: 'outline-variant' },

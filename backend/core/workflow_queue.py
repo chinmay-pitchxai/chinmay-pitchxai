@@ -133,7 +133,8 @@ def claim_next(
                     WHERE d.normalized_phone = right(replace(replace(l.phone,'+',''),' ',''), 10)
                   )
                 {recently_filter}
-                ORDER BY j.priority ASC,j.due_at_utc ASC,j.id ASC
+                ORDER BY CASE WHEN j.eligible_pool LIKE '%digital%' THEN 0 ELSE 1 END,
+                    j.priority DESC,j.due_at_utc ASC,j.id ASC
                 LIMIT 1 FOR UPDATE OF j, l SKIP LOCKED""",
                 (now, eligible_pool) + ((now - skip_recently_days * 86400,) if skip_recently_days > 0 else ()),
             ).fetchone()
@@ -152,7 +153,8 @@ def claim_next(
                     WHERE d.normalized_phone = substr(replace(replace(l.phone,'+',''),' ',''), -10)
                   )
                 {recently_filter}
-                ORDER BY j.priority ASC,j.due_at_utc ASC,j.id ASC LIMIT 1""",
+                ORDER BY CASE WHEN j.eligible_pool LIKE '%digital%' THEN 0 ELSE 1 END,
+                    j.priority DESC,j.due_at_utc ASC,j.id ASC LIMIT 1""",
                 (now, eligible_pool) + ((now - skip_recently_days * 86400,) if skip_recently_days > 0 else ()),
             ).fetchone()
         if not row:

@@ -10,7 +10,7 @@ from typing import Any
 
 CATALOG_PATH = Path(__file__).resolve().parent.parent / "sandbox" / "agents.json"
 EXPECTED_SANDBOXES = (1, 2, 3, 4)
-EXPECTED_LINES = tuple(f"P{i}" for i in range(1, 10))
+EXPECTED_LINES = tuple(f"P{i}" for i in range(1, 12))
 
 
 class SandboxCatalogError(RuntimeError):
@@ -57,7 +57,7 @@ def load_sandbox_catalog() -> tuple[dict[str, Any], ...]:
         raise SandboxCatalogError("Exactly Sandboxes 1, 2, 3 and 4 are required")
     if tuple(sorted(line_owner, key=lambda value: int(value[1:]))) != EXPECTED_LINES:
         missing = sorted(set(EXPECTED_LINES) - set(line_owner))
-        raise SandboxCatalogError(f"Every line P1-P9 must have one owner; missing={missing}")
+        raise SandboxCatalogError(f"Every line P1-P11 must have one owner; missing={missing}")
     from core.workflow_models import JobType
 
     expected_jobs = {job_type.value for job_type in JobType}

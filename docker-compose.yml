@@ -17,6 +17,10 @@ x-backend-env: &backend-env
   PGDATABASE: technopoliss
   PGUSER: technopoliss
       PGPASSWORD: ${POSTGRES_PASSWORD:-technopoliss}
+  # Digital broker phone lines
+  DIGITAL_BROKER_1_PHONE: P3
+  DIGITAL_BROKER_2_PHONE: P10
+  DIGITAL_BROKER_3_PHONE: P11
   # Gemini + Vobiz credentials and every runtime setting come from backend/.env
   ENV_FILE_GUARD: "1"
 

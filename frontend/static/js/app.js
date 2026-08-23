@@ -915,6 +915,54 @@ function showPage(pageId, navEl) {
     if (pageId === 'whatsapp') {
         if (typeof loadWhatsAppStatus === 'function') loadWhatsAppStatus();
     }
+    if (pageId === 'digital') {
+        if (typeof loadDigitalLeads === 'function') loadDigitalLeads();
+        loadBrokerStats();
+    }
+}
+
+// ─── Broker Stats (Sandbox 1.2 Digital Leads) ───
+async function loadBrokerStats() {
+    const roleQ = typeof apiRoleQ === 'function' ? apiRoleQ() : encodeURIComponent(currentRole || 'sales_1');
+    try {
+        const res = await fetch(apiUrl('/api/dashboard?role=' + roleQ + '&sandbox=1'), {
+            headers: authHeaders(),
+            credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error('Failed to load broker stats');
+        const data = await res.json();
+        const brokerStats = data.broker_stats || {};
+
+        for (let i = 1; i <= 3; i++) {
+            const key = 'broker_' + i;
+            const stats = brokerStats[key] || {};
+            const active = Number(stats.active_calls || stats.active || stats.dialing || 0);
+            const total = Number(stats.total || 0);
+            const dialing = Number(stats.dialing || 0);
+            const done = Number(stats.completed || stats.called || 0);
+
+            const activeEl = document.getElementById('broker-active-badge-' + i);
+            const totalEl = document.getElementById('broker-stat-total-' + i);
+            const dialingEl = document.getElementById('broker-stat-dialing-' + i);
+            const doneEl = document.getElementById('broker-stat-done-' + i);
+            const progressEl = document.getElementById('broker-progress-' + i);
+
+            if (activeEl) activeEl.textContent = active + ' active';
+            if (totalEl) totalEl.textContent = total.toLocaleString();
+            if (dialingEl) dialingEl.textContent = dialing.toLocaleString();
+            if (doneEl) doneEl.textContent = done.toLocaleString();
+            if (progressEl) {
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                progressEl.style.width = pct + '%';
+            }
+        }
+    } catch (e) {
+        console.warn('Broker stats load failed:', e);
+    }
+}
+
+function filterDigitalByBroker(brokerNum) {
+    showToast('Filtering by Broker ' + brokerNum, 'info');
 }
 
 // ─── WhatsApp (OpenWA gateway) ───

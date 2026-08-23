@@ -98,7 +98,9 @@ async def dispatch_once(
     candidates = conn.execute(
         """SELECT eligible_pool,MIN(priority) AS p,MIN(due_at_utc) AS due
         FROM workflow_jobs WHERE status='ready' AND due_at_utc<=?
-        GROUP BY eligible_pool ORDER BY p ASC,due ASC""", (now,)
+        GROUP BY eligible_pool ORDER BY
+            CASE WHEN eligible_pool LIKE '%digital%' THEN 0 ELSE 1 END,
+            p ASC,due ASC""", (now,)
     ).fetchall()
     for pool_name, _priority, _due in candidates:
         pool = NumberPool(pool_name)
@@ -122,7 +124,8 @@ async def dispatch_once(
             executor = phone_executor
             if not number:
                 continue
-        if number and number_cooling and number_cooling(number):
+        is_digital = "digital" in pool_name.lower()
+        if number and number_cooling and not is_digital and number_cooling(number):
             continue
         # Callbacks must ring from the *claimed* lead's originating line
         # (P1/P2 cold, P3 digital). Resolve inside the claim transaction so the

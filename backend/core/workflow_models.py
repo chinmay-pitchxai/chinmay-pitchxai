@@ -49,6 +49,8 @@ class NumberPool(StrEnum):
     # Canonical four-sandbox pools. Legacy members above remain readable for
     # old queued rows, while all new jobs use these explicit contracts.
     SANDBOX1_DIGITAL = "sandbox1_digital"
+    SANDBOX1_DIGITAL_2 = "sandbox1_digital_2"
+    SANDBOX1_DIGITAL_3 = "sandbox1_digital_3"
     SANDBOX1_CALLBACK = "sandbox1_callback"
     SANDBOX2_RETRY_2 = "sandbox2_retry_2"
     SANDBOX2_RETRY_3_COLD = "sandbox2_retry_3_cold"

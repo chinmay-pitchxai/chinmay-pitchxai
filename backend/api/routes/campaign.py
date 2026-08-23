@@ -6,13 +6,15 @@ import asyncio
 import csv
 import datetime
 import io
+import json
 import re
 import secrets
 from datetime import timezone
 from pathlib import Path
+from urllib.parse import parse_qs
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from core.utils import range_file_response
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -68,6 +70,21 @@ class DigitalLeadWebhookPayload(BaseModel):
     rows: list[DigitalLeadWebhookRow] = Field(min_length=1, max_length=500)
 
 
+_APPS_SCRIPT_ORIGIN = "https://script.google.com"
+
+
+def _apps_script_cors_headers(origin: str | None = None) -> dict[str, str]:
+    """Return CORS headers that allow Google Apps Script origins."""
+    allowed = (_APPS_SCRIPT_ORIGIN, "https://script.googleusercontent.com")
+    allow_origin = origin if origin in allowed else _APPS_SCRIPT_ORIGIN
+    return {
+        "Access-Control-Allow-Origin": allow_origin,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, X-Digital-Leads-Secret, Authorization",
+        "Access-Control-Max-Age": "86400",
+    }
+
+
 async def _ensure_digital_p3_dispatcher() -> dict:
     """Start only the P3-aware orchestrator; never fall back to cold dialing."""
     if settings.webhook_only_mode:
@@ -106,12 +123,25 @@ async def digital_leads_webhook(payload: DigitalLeadWebhookPayload, request: Req
         [row.model_dump() for row in payload.rows],
         broker_id=payload.broker_id,
     )
+    # Trigger immediate dispatch for digital leads
+    from core.orchestration_runtime import _SUPERVISOR_INSTANCE
+    if _SUPERVISOR_INSTANCE:
+        _SUPERVISOR_INSTANCE.trigger_immediate_dispatch()
     result["worker"] = await _ensure_digital_p3_dispatcher() if result["queued"] else {"auto_started": False}
     if result["queued"] and not result["worker"].get("auto_started"):
         for row_result in result["results"]:
             if row_result["status"] == "queued":
                 row_result["status"] = "queued_waiting_for_dialer"
     return result
+
+
+@router.post("/trigger-dispatch")
+async def trigger_dispatch():
+    """Manually trigger dispatch for testing."""
+    from core.orchestration_runtime import _SUPERVISOR_INSTANCE
+    if _SUPERVISOR_INSTANCE:
+        _SUPERVISOR_INSTANCE.trigger_immediate_dispatch()
+    return {"status": "triggered"}
 
 
 @router.get("/digital-feed-status")

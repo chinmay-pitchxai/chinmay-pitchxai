@@ -1,7 +1,7 @@
 """Central sandbox configuration — single source of truth for all sandboxes.
 
 The implementation plan defines 4 operational sandboxes:
-  Sandbox 1: Initial Outreach (P1/P2 cold, P3 digital) + callbacks
+  Sandbox 1: Initial Outreach (P1/P2 cold, P3/P10/P11 digital) + callbacks
   Sandbox 2: Failed-Call Retry (P4 attempt 2, P5/P6 attempt 3)
   Sandbox 3: Nurture & Site Visits (P7, P8)
   Sandbox 4: Post-Visit Feedback (P9)
@@ -17,7 +17,7 @@ from typing import Any
 OPERATIONAL_SANDBOXES: dict[str, dict[str, Any]] = {
     "sandbox_1_initial_outreach": {
         "display_name": "Sandbox 1 · Initial Outreach",
-        "phones": ["P1", "P2", "P3"],
+        "phones": ["P1", "P2", "P3", "P10", "P11"],
         "purpose": "Fresh cold and digital lead qualification",
         "job_types": ("fresh_call", "callback"),
     },

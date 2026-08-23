@@ -84,6 +84,8 @@ def schedule_job(conn, *, lead_id: int, job_type: JobType, source: str,
         except Exception as exc:
             raise PermissionError("Outbound consent could not be verified") from exc
     pool = pool_for(job_type, source, attempt)
+    # Digital leads get high priority (1) to ensure they are dispatched before normal leads.
+    priority = 1 if source in ("digital", "digital_marketing") else PRIORITY[job_type]
     # User-requested callbacks are an explicit-time contract. Every other
     # automated touch is constrained to the configured TRAI-safe calling
     # window, including immediately enqueued fresh leads and 09:00 reminders.
@@ -91,7 +93,7 @@ def schedule_job(conn, *, lead_id: int, job_type: JobType, source: str,
         due_at = next_working_time(due_at)
     return create_job(
         conn, lead_id=lead_id, job_type=job_type.value,
-        priority=PRIORITY[job_type], due_at_utc=due_at.astimezone(timezone.utc).timestamp(),
+        priority=priority, due_at_utc=due_at.astimezone(timezone.utc).timestamp(),
         eligible_pool=pool.value, idempotency_key=key, attempt_number=attempt,
         source_type=source_type, source_id=source_id, payload=payload,
     )
