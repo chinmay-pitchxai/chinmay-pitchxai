@@ -135,11 +135,14 @@ def build_live_setup(
             "temperature": float(
                 temperature
                 if temperature is not None
-                else (getattr(settings, "gemini_live_temperature", 0.91) or 0.91)
+                else (getattr(settings, "gemini_live_temperature", 0.95) or 0.95)
             ),
         },
         "systemInstruction": {
-            "parts": [{"text": system_instruction}],
+            "parts": [
+                {"text": system_instruction},
+                {"text": "CRITICAL VOICE IDENTITY: You are Vernika, a real Indian woman from Hyderabad in her late 20s. You speak with a natural Hyderabadi Indian English accent. Your voice is warm, soft, and friendly — like talking to a friend on the phone. Pronounce words the Indian way: 'better' as 'bet-ter', 'water' as 'wa-ter', 'really' as 'ri-al-ly'. When speaking Telugu, pronounce it naturally as a native Hyderabadi. Never sound robotic, never sound like TTS, never sound like a call center agent. Sound like a REAL person having a genuine conversation."},
+            ],
         },
         "inputAudioTranscription": {},
         "outputAudioTranscription": {},

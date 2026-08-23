@@ -82,10 +82,14 @@ class Settings:
     digital_broker_1_sheet_url: str = (os.getenv("DIGITAL_BROKER_1_SHEET_URL") or "").strip()
     digital_broker_2_sheet_url: str = (os.getenv("DIGITAL_BROKER_2_SHEET_URL") or "").strip()
     digital_broker_3_sheet_url: str = (os.getenv("DIGITAL_BROKER_3_SHEET_URL") or "").strip()
+    # Digital broker phone lines
+    digital_broker_1_phone: str = (os.getenv("DIGITAL_BROKER_1_PHONE", "P3") or "P3").strip()
+    digital_broker_2_phone: str = (os.getenv("DIGITAL_BROKER_2_PHONE", "P10") or "P10").strip()
+    digital_broker_3_phone: str = (os.getenv("DIGITAL_BROKER_3_PHONE", "P11") or "P11").strip()
     google_sheets_oauth_client_id: str = (os.getenv("GOOGLE_SHEETS_OAUTH_CLIENT_ID") or "").strip()
     google_sheets_oauth_client_secret: str = (os.getenv("GOOGLE_SHEETS_OAUTH_CLIENT_SECRET") or "").strip()
     google_sheets_refresh_token: str = (os.getenv("GOOGLE_SHEETS_REFRESH_TOKEN") or "").strip()
-    google_sheets_poll_seconds: float = float(os.getenv("GOOGLE_SHEETS_POLL_SECONDS", "15") or "15")
+    google_sheets_poll_seconds: float = float(os.getenv("GOOGLE_SHEETS_POLL_SECONDS", "5") or "5")
 
     # Gemini API — Google AI Studio key (speech & text)
     gemini_api_key: str = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
@@ -119,8 +123,8 @@ class Settings:
 
     # Gemini Live API (native speech-to-speech for sub-800ms latency on phone calls)
     gemini_live_model: str = os.getenv("GEMINI_LIVE_MODEL", "models/gemini-3.1-flash-live-preview").strip()
-    gemini_live_voice: str = os.getenv("GEMINI_LIVE_VOICE", "Aoede").strip()
-    gemini_live_voice_sales_1: str = os.getenv("GEMINI_LIVE_VOICE_SALES_1", "Aoede").strip()
+    gemini_live_voice: str = os.getenv("GEMINI_LIVE_VOICE", "Kore").strip()
+    gemini_live_voice_sales_1: str = os.getenv("GEMINI_LIVE_VOICE_SALES_1", "Kore").strip()
     gemini_opening_style_prompt_female: str = os.getenv(
         "GEMINI_OPENING_STYLE_PROMPT_FEMALE",
         "INDIAN ENGLISH ACCENT, FEMALE, HYDERABAD — read this opening greeting in a warm, confident, natural Hyderabadi Indian English/Telugu bilingual accent. This is Indian English, NOT American, NOT British. Speak exactly like a real educated Hyderabadi woman in her late 20s on a phone call — natural Hyderabad rhythm, small pauses, gentle rising-falling intonation, contractions, soft rounded vowels. Pronounce words the Indian way: 'better' as 'bet-ter', 'water' as 'wa-ter', 'really' as 'ri-al-ly', 'Solitaire' with a soft Indian 'r'. Never sound like TTS, a narration, or an automated recording."
@@ -151,7 +155,7 @@ class Settings:
     failed_call_max_attempts: int = int(os.getenv("FAILED_CALL_MAX_ATTEMPTS", "3"))
     failed_call_retry_hours: int = int(os.getenv("FAILED_CALL_RETRY_HOURS", "24"))
 
-    # Autonomous orchestration: 4 sandboxes, 9 phone lines (P1–P9).
+    # Autonomous orchestration: 4 sandboxes, 11 phone lines (P1–P11).
     # Leave unset to run in shadow mode (queue promotes, nothing dials live).
     orchestration_live_enabled: bool = _b("ORCHESTRATION_LIVE_ENABLED", False)
     orchestration_lease_seconds: float = float(os.getenv("ORCHESTRATION_LEASE_SECONDS", "300"))
@@ -174,15 +178,15 @@ class Settings:
     # phone numbers are inserted and each receives one idempotent P3 job.
     digital_excel_path: str = os.getenv("DIGITAL_EXCEL_PATH", "").strip()
     digital_excel_sheet: str = os.getenv("DIGITAL_EXCEL_SHEET", "").strip()
-    digital_excel_poll_seconds: float = float(os.getenv("DIGITAL_EXCEL_POLL_SECONDS", "15"))
+    digital_excel_poll_seconds: float = float(os.getenv("DIGITAL_EXCEL_POLL_SECONDS", "5"))
     digital_excel_role: str = os.getenv("DIGITAL_EXCEL_ROLE", "sales_1").strip()
     orchestration_allow_shared_test_numbers: bool = _b("ORCHESTRATION_ALLOW_SHARED_TEST_NUMBERS", False)
     # Test mode: allow the same physical Vobiz number to back multiple logical
-    # lines (P1–P9) so a 2-number test account can exercise the full pipeline.
+    # lines (P1–P11) so a 2-number test account can exercise the full pipeline.
     # Production must keep one unique line per pool (fail-closed default).
     orchestration_test_mode: bool = _b("ORCHESTRATION_TEST_MODE", False)
     # P1/P2 cold fresh, P3 digital fresh, P4 attempt-2 retry, P5 attempt-3 cold,
-    # P6 attempt-3 digital, P7/P8 nurture, P9 feedback.
+    # P6 attempt-3 digital, P7/P8 nurture, P9 feedback, P10/P11 digital broker 2/3.
     p1_number: str = os.getenv("P1_NUMBER", "").strip()
     p2_number: str = os.getenv("P2_NUMBER", "").strip()
     p3_number: str = os.getenv("P3_NUMBER", "").strip()
@@ -192,6 +196,8 @@ class Settings:
     p7_number: str = os.getenv("P7_NUMBER", "").strip()
     p8_number: str = os.getenv("P8_NUMBER", "").strip()
     p9_number: str = os.getenv("P9_NUMBER", "").strip()
+    p10_number: str = os.getenv("P10_NUMBER", "").strip()
+    p11_number: str = os.getenv("P11_NUMBER", "").strip()
 
     # Auto WhatsApp follow-up after brochure/details sent
     whatsapp_followup_hours: int = int(os.getenv("WHATSAPP_FOLLOWUP_HOURS", "12"))
@@ -214,26 +220,26 @@ class Settings:
     gemini_live_activity_handling: str = (
         os.getenv("GEMINI_LIVE_ACTIVITY_HANDLING", "START_OF_ACTIVITY_INTERRUPTS").strip()
     )
-    gemini_live_vad_prefix_padding_ms: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_MS", "32"))
-    gemini_live_vad_silence_duration_ms: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_MS", "80"))
-    gemini_live_vad_prefix_padding_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_ULTRA_MS", "24"))
-    gemini_live_vad_silence_duration_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_ULTRA_MS", "60"))
+    gemini_live_vad_prefix_padding_ms: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_MS", "100") or "100")
+    gemini_live_vad_silence_duration_ms: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_MS", "200") or "200")
+    gemini_live_vad_prefix_padding_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_ULTRA_MS", "80") or "80")
+    gemini_live_vad_silence_duration_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_ULTRA_MS", "150") or "150")
     # Configurable sensitivity levels.
     # App aliases NORMAL map to HIGH on the wire in gemini_protocol.build_live_setup.
     # Gemini Live only accepts HIGH / LOW / UNSPECIFIED (NORMAL → 1007 if sent raw).
     gemini_live_start_sensitivity: str = (
         os.getenv("GEMINI_LIVE_START_SENSITIVITY")
         or os.getenv("GEMINI_LIVE_VAD_START_SENSITIVITY")
-        or "START_SENSITIVITY_NORMAL"
+        or "HIGH"
     ).strip()
     gemini_live_end_sensitivity: str = (
         os.getenv("GEMINI_LIVE_END_SENSITIVITY")
         or os.getenv("GEMINI_LIVE_VAD_END_SENSITIVITY")
-        or "END_SENSITIVITY_NORMAL"
+        or "HIGH"
     ).strip()
     # Appended system text nudging concise turns + yield-on-overlap (phone calls).
     gemini_live_append_turn_instructions: bool = _b("GEMINI_LIVE_APPEND_TURN_INSTRUCTIONS", True)
-    gemini_live_temperature: float = float(os.getenv("GEMINI_LIVE_TEMPERATURE", "0.65"))
+    gemini_live_temperature: float = float(os.getenv("GEMINI_LIVE_TEMPERATURE", "0.95") or "0.95")
     # When no scripted PCM opening: brief gate before forwarding callee mic → Gemini (avoids chopping first model syllable).
     vobiz_gemini_live_forward_mute_seconds: float = float(
         os.getenv("VOBIZ_GEMINI_FORWARD_MUTE_SECONDS", "0.05")

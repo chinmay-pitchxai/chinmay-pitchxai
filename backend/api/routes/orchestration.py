@@ -24,8 +24,10 @@ NUMBER_PURPOSE = {
     "P6": "Retry - attempt 3 (digital leads)",
     "P7": "Nurture & callbacks (interested leads)", "P8": "Nurture & callbacks (interested leads)",
     "P9": "Post-visit feedback calls",
+    "P10": "Digital broker 2 fresh calls",
+    "P11": "Digital broker 3 fresh calls",
 }
-NUMBER_ROLE = {f"P{i}": "sales_1" for i in range(1, 10)}
+NUMBER_ROLE = {f"P{i}": "sales_1" for i in range(1, 12)}
 POOL_LOGICAL = {pool.value: list(numbers) for pool, numbers in DEFAULT_POOLS.items()}
 
 
@@ -34,7 +36,7 @@ def _role(value: str) -> str:
 
 
 def _number_map() -> dict[str, str]:
-    return {f"P{i}": str(getattr(settings, f"p{i}_number", "") or "").strip() for i in range(1, 10)}
+    return {f"P{i}": str(getattr(settings, f"p{i}_number", "") or "").strip() for i in range(1, 12)}
 
 
 def _logical_for(real_number: str | None) -> str:
@@ -90,7 +92,7 @@ async def orchestration_numbers(role: str = Query("campaign")):
     role = _role(role)
     conn = _get_conn()
     configured = _number_map()
-    allowed = [i for i in range(1, 10) if role in str(NUMBER_ROLE.get(f"P{i}", "")).split(",")]
+    allowed = [i for i in range(1, 12) if role in str(NUMBER_ROLE.get(f"P{i}", "")).split(",")]
     rows = []
     for i in allowed:
         logical = f"P{i}"

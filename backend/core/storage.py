@@ -111,8 +111,8 @@ def init_db(data_dir: Optional[Path | str] = None) -> Path:
     except sqlite3.OperationalError:
         pass # Already exists
 
-    # Migration: add P1-P9 phone number columns for sandbox configuration
-    for i in range(1, 10):
+    # Migration: add P1-P11 phone number columns for sandbox configuration
+    for i in range(1, 12):
         try:
             conn.execute(f"ALTER TABLE role_state ADD COLUMN p{i}_number TEXT DEFAULT ''")
         except sqlite3.OperationalError:
@@ -598,7 +598,7 @@ def init_db(data_dir: Optional[Path | str] = None) -> Path:
             job_type TEXT NOT NULL,
             source_type TEXT NOT NULL DEFAULT '',
             source_id TEXT NOT NULL DEFAULT '',
-            priority INTEGER NOT NULL DEFAULT 5,
+            priority INTEGER NOT NULL DEFAULT 0,  -- 0=normal, 1=high (digital leads)
             status TEXT NOT NULL DEFAULT 'scheduled',
             due_at_utc REAL NOT NULL,
             eligible_pool TEXT NOT NULL DEFAULT '',
@@ -616,6 +616,8 @@ def init_db(data_dir: Optional[Path | str] = None) -> Path:
         CREATE INDEX IF NOT EXISTS idx_wj_status_due ON workflow_jobs(status, due_at_utc);
         CREATE INDEX IF NOT EXISTS idx_wj_lead ON workflow_jobs(lead_id);
         CREATE INDEX IF NOT EXISTS idx_wj_pool_status ON workflow_jobs(eligible_pool, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_jobs_priority ON workflow_jobs(status, priority, created_at);
+        CREATE INDEX IF NOT EXISTS idx_wj_digital_fasttrack ON workflow_jobs(status, eligible_pool, due_at_utc);
 
         CREATE TABLE IF NOT EXISTS lead_memory (
             lead_id INTEGER PRIMARY KEY,
@@ -678,6 +680,12 @@ def init_db(data_dir: Optional[Path | str] = None) -> Path:
         CREATE INDEX IF NOT EXISTS idx_wa_type ON whatsapp_messages(lead_id, message_type);
     """)
     conn.commit()
+
+    # Migration: add priority column to workflow_jobs if missing
+    try:
+        conn.execute("ALTER TABLE workflow_jobs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     # Create role-specific data directories for prompt + RAG files
     for role in ("sales_1",):
@@ -1004,8 +1012,8 @@ def _get_role_state_sync(role: str) -> dict:
         "vobiz": json.loads(row["vobiz_config"] or "{}"),
         "greeting_text": row["greeting_text"] or "",
     }
-    # Include P1-P9 phone numbers if columns exist
-    for i in range(1, 10):
+    # Include P1-P11 phone numbers if columns exist
+    for i in range(1, 12):
         key = f"p{i}_number"
         try:
             result[key] = row[key] or ""
@@ -1039,8 +1047,8 @@ def _save_role_state_sync(role: str, prompt: str = None, rag: str = None, vobiz_
     if greeting_text is not None:
         updates.append("greeting_text = ?")
         params.append(greeting_text)
-    # Save P1-P9 phone numbers
-    for i in range(1, 10):
+    # Save P1-P11 phone numbers
+    for i in range(1, 12):
         key = f"p{i}_number"
         if key in phone_numbers and phone_numbers[key] is not None:
             updates.append(f"{key} = ?")

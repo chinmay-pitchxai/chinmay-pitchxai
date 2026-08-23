@@ -47,7 +47,52 @@ async def fetch_rows(sheet_url: str, token: str) -> list[dict]:
     return rows
 
 
+async def google_sheets_broker_1_watcher() -> None:
+    """Watch Broker 1's Google Sheet for new leads."""
+    await _google_sheets_poll_loop("broker_1")
+
+
+async def google_sheets_broker_2_watcher() -> None:
+    """Watch Broker 2's Google Sheet for new leads."""
+    await _google_sheets_poll_loop("broker_2")
+
+
+async def google_sheets_broker_3_watcher() -> None:
+    """Watch Broker 3's Google Sheet for new leads."""
+    await _google_sheets_poll_loop("broker_3")
+
+
+async def _google_sheets_poll_loop(broker_id: str) -> None:
+    """Core polling loop for a single broker."""
+    url_map = {
+        "broker_1": settings.digital_broker_1_sheet_url,
+        "broker_2": settings.digital_broker_2_sheet_url,
+        "broker_3": settings.digital_broker_3_sheet_url,
+    }
+    url = url_map.get(broker_id, "")
+    if not url:
+        logger.info("[{}] No Google Sheet URL configured — watcher idle", broker_id)
+        return
+    logger.info("[{}] Google Sheets watcher started", broker_id)
+    while True:
+        try:
+            token = await access_token()
+            if not token:
+                logger.warning("[{}] awaiting GOOGLE_SHEETS_REFRESH_TOKEN", broker_id)
+            else:
+                rows = await fetch_rows(url, token)
+                result = await asyncio.to_thread(ingest_digital_rows, rows, broker_id=broker_id)
+                if result.get("saved") or result.get("queued"):
+                    logger.info("[GOOGLE-SHEETS] Change detected in broker {}, triggering ingestion result={}", broker_id, result)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("[{}] Google Sheets synchronization failed", broker_id)
+        await asyncio.sleep(max(3.0, settings.google_sheets_poll_seconds))
+
+
 async def google_sheets_watcher() -> None:
+    """Legacy fallback: poll all 3 broker sheets in a single loop (for backwards compat)."""
     feeds = {
         "broker_1": settings.digital_broker_1_sheet_url,
         "broker_2": settings.digital_broker_2_sheet_url,
@@ -64,9 +109,9 @@ async def google_sheets_watcher() -> None:
                         rows = await fetch_rows(url, token)
                         result = await asyncio.to_thread(ingest_digital_rows, rows, broker_id=broker_id)
                         if result.get("saved") or result.get("queued"):
-                            logger.info("Google Sheet synced broker={} result={}", broker_id, result)
+                            logger.info("[GOOGLE-SHEETS] Change detected in broker {}, triggering ingestion result={}", broker_id, result)
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Google Sheets synchronization failed")
-        await asyncio.sleep(max(10, settings.google_sheets_poll_seconds))
+        await asyncio.sleep(max(3.0, settings.google_sheets_poll_seconds))

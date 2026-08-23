@@ -206,21 +206,36 @@ def ingest_digital_rows(rows: list[dict], *, broker_id: str) -> dict:
     }
 
 
-async def digital_excel_watcher() -> None:
-    configured = Path(settings.digital_excel_path).expanduser()
+async def digital_excel_broker_1_watcher() -> None:
+    """Watch Broker 1's Excel feed directory for new leads."""
+    await _digital_excel_poll_loop("broker_1")
+
+
+async def digital_excel_broker_2_watcher() -> None:
+    """Watch Broker 2's Excel feed directory for new leads."""
+    await _digital_excel_poll_loop("broker_2")
+
+
+async def digital_excel_broker_3_watcher() -> None:
+    """Watch Broker 3's Excel feed directory for new leads."""
+    await _digital_excel_poll_loop("broker_3")
+
+
+async def _digital_excel_poll_loop(broker_id: str) -> None:
+    """Core polling loop for a single broker's Excel feed directory."""
+    base = Path(settings.digital_excel_path).expanduser()
+    configured = base / broker_id
     last_signatures: dict[str, tuple[int, int]] = {}
-    logger.info("Sandbox 1.2 digital Excel watcher configured for {}", configured)
+    logger.info("[{}] digital Excel watcher configured for {}", broker_id, configured)
     while True:
         try:
-            # Self-heal: keep the feed directory present so channel partners can
-            # drop files at any time without operator intervention.
             if not configured.exists():
                 try:
                     configured.mkdir(parents=True, exist_ok=True)
-                    logger.info("Auto-created digital Excel feed path: {}", configured)
+                    logger.info("[{}] Auto-created digital Excel feed path: {}", broker_id, configured)
                 except Exception as _mkdir_exc:
-                    logger.warning("Could not create digital Excel feed path {}: {}", configured, _mkdir_exc)
-            
+                    logger.warning("[{}] Could not create digital Excel feed path {}: {}", broker_id, configured, _mkdir_exc)
+
             files = (
                 sorted(
                     (p for p in configured.iterdir() if p.is_file() and p.suffix.lower() in (".xlsx", ".xlsm", ".csv", ".tsv")),
@@ -236,6 +251,56 @@ async def digital_excel_watcher() -> None:
                     signature_key = str(feed_file.resolve())
                     if signature == last_signatures.get(signature_key):
                         continue
+                    logger.info("[DIGITAL-EXCEL] Change detected in {}, triggering ingestion", feed_file.name)
+                    result = await asyncio.to_thread(
+                        ingest_digital_file,
+                        feed_file,
+                        role=settings.digital_excel_role,
+                        sheet_name=settings.digital_excel_sheet,
+                    )
+                    last_signatures[signature_key] = signature
+                    logger.info("[{}] digital feed synchronized file={} result={}", broker_id, feed_file.name, result)
+            elif not configured.exists():
+                logger.warning("[{}] Digital Excel feed not found: {}", broker_id, configured)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("[{}] Digital Excel feed synchronization failed", broker_id)
+        await asyncio.sleep(max(3.0, settings.digital_excel_poll_seconds))
+
+
+async def digital_excel_watcher() -> None:
+    """Legacy fallback: watch the entire Excel feed directory (for backwards compat)."""
+    configured = Path(settings.digital_excel_path).expanduser()
+    last_signatures: dict[str, tuple[int, int]] = {}
+    logger.info("Sandbox 1.2 digital Excel watcher configured for {}", configured)
+    while True:
+        try:
+            # Self-heal: keep the feed directory present so channel partners can
+            # drop files at any time without operator intervention.
+            if not configured.exists():
+                try:
+                    configured.mkdir(parents=True, exist_ok=True)
+                    logger.info("Auto-created digital Excel feed path: {}", configured)
+                except Exception as _mkdir_exc:
+                    logger.warning("Could not create digital Excel feed path {}: {}", configured, _mkdir_exc)
+
+            files = (
+                sorted(
+                    (p for p in configured.iterdir() if p.is_file() and p.suffix.lower() in (".xlsx", ".xlsm", ".csv", ".tsv")),
+                    key=lambda p: p.stat().st_mtime_ns,
+                )
+                if configured.is_dir()
+                else ([configured] if configured.is_file() else [])
+            )
+            if files:
+                for feed_file in files:
+                    stat = feed_file.stat()
+                    signature = (stat.st_mtime_ns, stat.st_size)
+                    signature_key = str(feed_file.resolve())
+                    if signature == last_signatures.get(signature_key):
+                        continue
+                    logger.info("[DIGITAL-EXCEL] Change detected in {}, triggering ingestion", feed_file.name)
                     result = await asyncio.to_thread(
                         ingest_digital_file,
                         feed_file,

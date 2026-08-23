@@ -94,10 +94,16 @@ async def capture_phrase_pcm(
         voice = settings.gemini_live_voice_sales_1
     model = settings.gemini_live_model
 
+    style = getattr(settings, "gemini_opening_style_prompt_female", "").strip()
+
     system_prompt = (
-        "You are a voice agent on a phone call. Speak ONLY the exact sentence you are given. "
-        "One sentence, natural Indian English delivery, then stop."
+        "You are recording a short phrase for a real-estate phone call.\n"
+        "Speak ONLY the exact sentence given — nothing before it, nothing after it.\n"
+        "Deliver like a calm Hyderabad sales professional on a desk phone: warm, clear, unhurried.\n"
+        "About 2-3 seconds total, natural Indian delivery, then stop.\n"
     )
+    if style:
+        system_prompt += f"\nVoice style: {style}\n"
     setup = build_live_setup(
         model=model,
         system_instruction=system_prompt,

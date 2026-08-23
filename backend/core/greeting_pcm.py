@@ -136,6 +136,22 @@ def load_recorded_greeting_pcm(
         return None
 
 
+def invalidate_greeting_cache(role: str) -> None:
+    """Force regeneration of greeting PCM on next call."""
+    pcm_path, meta_path = greeting_pcm_paths(role)
+    if pcm_path.is_file():
+        pcm_path.unlink()
+    if meta_path.is_file():
+        meta_path.unlink()
+    latest = _get_greeting_cache_path(role)
+    latest_meta = _get_greeting_cache_metadata_path(role)
+    if latest.is_file():
+        latest.unlink()
+    if latest_meta.is_file():
+        latest_meta.unlink()
+    logger.info("Invalidated greeting cache for role={}", role)
+
+
 def _get_greeting_cache_path(role: str) -> Path:
     base_dir = _greetings_base_dir()
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -194,12 +210,13 @@ async def _generate_and_cache_greeting(role: str, text: str, voice: str) -> Opti
         return None
 
     live_voice = (voice or settings.gemini_live_voice or "Aoede").strip()
-
+    if role == "sales_1" and settings.gemini_live_voice_sales_1:
+        live_voice = settings.gemini_live_voice_sales_1
 
     try:
         from services.live_greeting_capture import capture_live_greeting_pcm
 
-        logger.info("Capturing greeting via Gemini Live for role={} (matches call voice)", role)
+        logger.info("Capturing greeting via Gemini Live for role={} voice={} (matches call voice)", role, live_voice)
         pcm, sr = await capture_live_greeting_pcm(role, text)
         if sr != 16000:
             from services.vobiz_bridge.audio import pcm_resample

@@ -774,6 +774,17 @@
                         </svg>
                         Campaigns
                     </div>
+                    <div class="nav-item" id="nav-digital" onclick="showPageNav('digital',this)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke-width="1.5"/>
+                            <line x1="3" y1="9" x2="21" y2="9" stroke-width="1.5"/>
+                            <line x1="3" y1="15" x2="21" y2="15" stroke-width="1.5"/>
+                            <line x1="9" y1="3" x2="9" y2="21" stroke-width="1.5"/>
+                            <line x1="15" y1="3" x2="15" y2="21" stroke-width="1.5"/>
+                        </svg>
+                        Digital Leads
+                        <span id="digital-badge" class="badge-tag" style="margin-left:auto;font-size:10px;padding:2px 7px;background:rgba(0,122,255,0.12);color:#007AFF;display:none;"></span>
+                    </div>
 
                 </div>
                 <div class="nav-section">
@@ -790,6 +801,13 @@
                             <path d="M12 2a10 10 0 00-8.66 15L2 22l5.16-1.32A10 10 0 1012 2z" stroke-width="1.5"/>
                         </svg>
                         WhatsApp
+                    </div>
+                    <div class="nav-item" id="nav-digital" onclick="showPageNav('digital',this)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke-width="1.5"/>
+                            <path d="M14 2v6h6M12 18v-6M9 15h6" stroke-width="1.5"/>
+                        </svg>
+                        Digital Leads
                     </div>
                     <div class="nav-item" id="nav-tuning" onclick="showPageNav('tuning',this)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1478,6 +1496,37 @@
                 </div>
             </div>
 
+            <!-- ── DIGITAL LEADS ── -->
+            <div id="page-digital" class="page-section">
+                <div class="page-head-split">
+                    <div>
+                        <h2 style="font-size:clamp(1.25rem,4vw,28px);font-weight:800;letter-spacing:-.02em;margin:0;">Digital Leads</h2>
+                        <p style="color:var(--text-secondary);font-size:14px;margin:6px 0 0;">Queued digital leads pending processing</p>
+                    </div>
+                    <div class="page-head-actions" style="align-items:center;">
+                        <button class="btn btn-ghost btn-sm touch-target" onclick="loadDigitalLeads()">Refresh</button>
+                    </div>
+                </div>
+                <div class="card" style="padding:0;overflow:hidden;">
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="padding-left:20px;">Name</th>
+                                    <th>Phone</th>
+                                    <th>Source</th>
+                                    <th>Added</th>
+                                    <th style="text-align:right;padding-right:20px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="digital-leads-tbody">
+                                <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-secondary);">No digital leads queued.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- ── MAKE A CALL ── -->
             <div id="page-manual" class="page-section">
                 <div class="page-head-split">
@@ -1599,6 +1648,212 @@
                             <div id="wa-qr-placeholder" style="font-size:12px;color:var(--text-tertiary);padding:16px;">Waiting for QR…</div>
                             <img id="wa-qr-img" src="" alt="WhatsApp pairing QR" style="display:none;width:100%;height:100%;object-fit:contain;" />
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── DIGITAL LEADS ── -->
+            <div id="page-digital" class="page-section">
+                <div class="page-head-split">
+                    <div>
+                        <h2 style="font-size:clamp(1.25rem,4vw,28px);font-weight:800;letter-spacing:-.02em;margin:0;">Digital Leads</h2>
+                        <p style="color:var(--text-secondary);font-size:14px;margin:6px 0 0;">Broker sheets sync, upload leads, and digital lead queue</p>
+                    </div>
+                    <div class="page-head-actions" style="align-items:center;">
+                        <button class="btn btn-ghost btn-sm touch-target" onclick="loadDigitalLeads()">Refresh</button>
+                    </div>
+                </div>
+
+                <!-- ══════════ STATS BAR ══════════ -->
+                <div class="stats-grid" style="margin-bottom:var(--space-xl);">
+                    <div class="stat-card" data-accent="total">
+                        <div class="stat-label">Total Digital Leads</div>
+                        <div class="stat-value" id="digital-stat-total">0</div>
+                        <div class="stat-progress"><div class="stat-progress-fill" id="bar-digital-total" style="width:0%"></div></div>
+                    </div>
+                    <div class="stat-card" data-accent="called">
+                        <div class="stat-label">Currently Dialing</div>
+                        <div class="stat-value" id="digital-stat-dialing">0</div>
+                        <div class="stat-progress"><div class="stat-progress-fill" id="bar-digital-dialing" style="width:0%"></div></div>
+                    </div>
+                    <div class="stat-card" data-accent="interested">
+                        <div class="stat-label">Completed Today</div>
+                        <div class="stat-value" id="digital-stat-completed">0</div>
+                        <div class="stat-progress"><div class="stat-progress-fill" id="bar-digital-completed" style="width:0%"></div></div>
+                    </div>
+                    <div class="stat-card" data-accent="failed">
+                        <div class="stat-label">Failed</div>
+                        <div class="stat-value" id="digital-stat-failed">0</div>
+                        <div class="stat-progress"><div class="stat-progress-fill" id="bar-digital-failed" style="width:0%"></div></div>
+                    </div>
+                </div>
+
+                <!-- ══════════ BROKER LEAD STATS (per-broker active count) ══════════ -->
+                <div class="card" style="margin-bottom:var(--space-xl);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-lg);">
+                        <h3 style="font-size:16px;font-weight:700;margin:0;">Broker Leads Overview</h3>
+                        <span style="font-size:11px;color:var(--text-tertiary);">Sandbox 1.2 · Digital Leads</span>
+                    </div>
+                    <div id="broker-stats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--space-md);">
+                        <div class="digital-broker-card" id="broker-card-1" style="background:var(--card-hover);border:1px solid var(--border);border-radius:12px;padding:var(--space-lg);cursor:pointer;" onclick="filterDigitalByBroker(1)">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-sm);">
+                                <span style="font-size:14px;font-weight:700;color:var(--text);">Broker 1 (P3)</span>
+                                <span id="broker-active-badge-1" class="badge-tag tag-int" style="font-size:10px;">0 active</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);">
+                                <span>Total: <strong id="broker-stat-total-1" style="color:var(--text);">0</strong></span>
+                                <span>Dialing: <strong id="broker-stat-dialing-1" style="color:var(--text);">0</strong></span>
+                                <span>Done: <strong id="broker-stat-done-1" style="color:var(--text);">0</strong></span>
+                            </div>
+                            <div class="progress-bar-bg" style="margin-top:8px;">
+                                <div class="progress-bar-fill" id="broker-progress-1" style="width:0%;transition:width 0.5s ease;"></div>
+                            </div>
+                        </div>
+                        <div class="digital-broker-card" id="broker-card-2" style="background:var(--card-hover);border:1px solid var(--border);border-radius:12px;padding:var(--space-lg);cursor:pointer;" onclick="filterDigitalByBroker(2)">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-sm);">
+                                <span style="font-size:14px;font-weight:700;color:var(--text);">Broker 2 (P10)</span>
+                                <span id="broker-active-badge-2" class="badge-tag tag-int" style="font-size:10px;">0 active</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);">
+                                <span>Total: <strong id="broker-stat-total-2" style="color:var(--text);">0</strong></span>
+                                <span>Dialing: <strong id="broker-stat-dialing-2" style="color:var(--text);">0</strong></span>
+                                <span>Done: <strong id="broker-stat-done-2" style="color:var(--text);">0</strong></span>
+                            </div>
+                            <div class="progress-bar-bg" style="margin-top:8px;">
+                                <div class="progress-bar-fill" id="broker-progress-2" style="width:0%;transition:width 0.5s ease;"></div>
+                            </div>
+                        </div>
+                        <div class="digital-broker-card" id="broker-card-3" style="background:var(--card-hover);border:1px solid var(--border);border-radius:12px;padding:var(--space-lg);cursor:pointer;" onclick="filterDigitalByBroker(3)">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-sm);">
+                                <span style="font-size:14px;font-weight:700;color:var(--text);">Broker 3 (P11)</span>
+                                <span id="broker-active-badge-3" class="badge-tag tag-int" style="font-size:10px;">0 active</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);">
+                                <span>Total: <strong id="broker-stat-total-3" style="color:var(--text);">0</strong></span>
+                                <span>Dialing: <strong id="broker-stat-dialing-3" style="color:var(--text);">0</strong></span>
+                                <span>Done: <strong id="broker-stat-done-3" style="color:var(--text);">0</strong></span>
+                            </div>
+                            <div class="progress-bar-bg" style="margin-top:8px;">
+                                <div class="progress-bar-fill" id="broker-progress-3" style="width:0%;transition:width 0.5s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ══════════ BROKER SHEETS STATUS ══════════ -->
+                <div class="card" style="margin-bottom:var(--space-xl);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-lg);">
+                        <h3 style="font-size:16px;font-weight:700;margin:0;">Broker Sheets Status</h3>
+                        <button class="btn btn-ghost btn-sm" onclick="loadDigitalBrokers()" style="font-size:11px;padding:4px 10px;">Refresh</button>
+                    </div>
+                    <div id="digital-brokers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-md);">
+                        <div class="digital-broker-card" style="background:var(--card-hover);border:1px solid var(--border);border-radius:12px;padding:var(--space-lg);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-md);">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <div id="broker-dot-1" style="width:8px;height:8px;border-radius:50%;background:#dc2626;"></div>
+                                    <span style="font-size:14px;font-weight:700;color:var(--text);">Broker 1</span>
+                                </div>
+                                <span id="broker-status-1" class="badge-tag tag-fail">Disconnected</span>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;word-break:break-all;" id="broker-url-1">No URL configured</div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-top:var(--space-sm);">
+                                <span>Last sync: <strong id="broker-sync-1" style="color:var(--text);">—</strong></span>
+                                <span>Leads: <strong id="broker-leads-1" style="color:var(--text);">0</strong></span>
+                            </div>
+                        </div>
+                        <div class="digital-broker-card" style="background:var(--card-hover);border:1px solid var(--border);border-radius:12px;padding:var(--space-lg);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-md);">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <div id="broker-dot-2" style="width:8px;height:8px;border-radius:50%;background:#dc2626;"></div>
+                                    <span style="font-size:14px;font-weight:700;color:var(--text);">Broker 2</span>
+                                </div>
+                                <span id="broker-status-2" class="badge-tag tag-fail">Disconnected</span>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;word-break:break-all;" id="broker-url-2">No URL configured</div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-top:var(--space-sm);">
+                                <span>Last sync: <strong id="broker-sync-2" style="color:var(--text);">—</strong></span>
+                                <span>Leads: <strong id="broker-leads-2" style="color:var(--text);">0</strong></span>
+                            </div>
+                        </div>
+                        <div class="digital-broker-card" style="background:var(--card-hover);border:1px solid var(--border);border-radius:12px;padding:var(--space-lg);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-md);">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <div id="broker-dot-3" style="width:8px;height:8px;border-radius:50%;background:#dc2626;"></div>
+                                    <span style="font-size:14px;font-weight:700;color:var(--text);">Broker 3</span>
+                                </div>
+                                <span id="broker-status-3" class="badge-tag tag-fail">Disconnected</span>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;word-break:break-all;" id="broker-url-3">No URL configured</div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-top:var(--space-sm);">
+                                <span>Last sync: <strong id="broker-sync-3" style="color:var(--text);">—</strong></span>
+                                <span>Leads: <strong id="broker-leads-3" style="color:var(--text);">0</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ══════════ UPLOAD ZONE ══════════ -->
+                <div class="card" style="margin-bottom:var(--space-xl);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-lg);">
+                        <h3 style="font-size:16px;font-weight:700;margin:0;">Upload Digital Leads</h3>
+                    </div>
+                    <div class="card upload-zone" onclick="document.getElementById('digital-file-upload').click()" id="digital-upload-dropzone">
+                        <div style="text-align:center;padding:var(--space-3xl) 0;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:44px;height:44px;color:var(--text-tertiary);margin-bottom:var(--space-lg);">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-width="1.5"/>
+                            </svg>
+                            <p style="font-weight:700;font-size:17px;margin:0 0 4px;color:var(--text);">Upload Digital Lead File</p>
+                            <p style="font-size:13px;color:var(--text-secondary);margin:0;">CSV or Excel (.xlsx, .xls)</p>
+                            <p id="digital-upload-filename" style="display:none;margin:var(--space-lg) 0 0;font-size:13px;color:var(--primary);font-weight:700;"></p>
+                        </div>
+                        <input type="file" id="digital-file-upload" style="display:none;" accept=".csv,.xlsx,.xls" onchange="uploadDigitalLeads(this)">
+                    </div>
+                    <div id="digital-upload-progress" style="display:none;margin-top:var(--space-lg);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-sm);">
+                            <span style="font-size:12px;font-weight:600;color:var(--text-secondary);">Uploading...</span>
+                            <span id="digital-upload-pct" style="font-size:12px;font-weight:700;color:var(--primary);">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="digital-upload-bar" style="width:0%;transition:width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ══════════ DIGITAL LEADS QUEUE ══════════ -->
+                <div class="card" style="padding:0;overflow:hidden;margin-bottom:var(--space-xl);">
+                    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Digital Leads Queue</span>
+                            <span id="digital-queue-count" style="font-size:11px;color:var(--text-tertiary);">0 leads</span>
+                            <span id="digital-live-indicator" class="live-feed-indicator live-feed-paused" title="Auto-refreshes every 3s">Auto-refresh OFF</span>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input id="digital-search-input" type="search" oninput="renderDigitalLeads()" placeholder="Search name / phone…" style="max-width:200px;font-size:12px;padding:6px 10px;border-radius:8px;background:transparent;border:1px solid var(--border);color:var(--text);">
+                            <select id="digital-status-filter" onchange="renderDigitalLeads()" style="font-size:11px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);min-width:100px;">
+                                <option value="">All Statuses</option>
+                                <option value="Queued">Queued</option>
+                                <option value="Dialing">Dialing</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Failed">Failed</option>
+                            </select>
+                            <button class="btn btn-ghost btn-sm" onclick="toggleDigitalAutoRefresh()" id="digital-auto-refresh-btn" style="font-size:11px;padding:4px 10px;">Auto-refresh</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Phone</th>
+                                    <th>Name</th>
+                                    <th>Broker</th>
+                                    <th>Status</th>
+                                    <th style="text-align:right;padding-right:20px;">Time Added</th>
+                                </tr>
+                            </thead>
+                            <tbody id="digital-leads-tbody">
+                                <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-secondary);">No digital leads yet. Upload a file or sync broker sheets.</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

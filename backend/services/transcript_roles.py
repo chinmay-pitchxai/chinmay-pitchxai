@@ -70,10 +70,12 @@ def transcript_has_severe_speaker_swap(turns: list[dict]) -> bool:
     """True when multiple obvious agent script lines are labeled as user."""
     if not turns:
         return False
+    from services.transcript_hybrid import _normalize_role
+
     bad = sum(
         1
         for t in turns
-        if (t.get("role") or "").lower() == "user" and _is_agent_content(str(t.get("content") or ""))
+        if _normalize_role(t.get("role") or "") == "user" and _is_agent_content(str(t.get("content") or ""))
     )
     return bad >= 2
 
@@ -94,11 +96,15 @@ def fix_transcript_speaker_roles(turns: list[dict], agent_name: str = "") -> lis
     if not turns:
         return turns
 
+    from services.transcript_hybrid import _normalize_role
+
     agent_lower = (agent_name or "").strip().lower()
+    _display_agent = (agent_name or "Vernika").strip() or "Vernika"
     out: list[dict] = []
 
     for i, turn in enumerate(turns):
-        role = (turn.get("role") or "user").strip().lower()
+        raw_role = (turn.get("role") or "user").strip()
+        role = _normalize_role(raw_role)
         content = (turn.get("content") or turn.get("text") or "").strip()
         if not content:
             continue
@@ -117,7 +123,7 @@ def fix_transcript_speaker_roles(turns: list[dict], agent_name: str = "") -> lis
         elif i == 0 and _is_agent_content(content):
             role = "assistant"
         elif i > 0:
-            prev_role = out[-1]["role"] if out else "assistant"
+            prev_role = _normalize_role(out[-1]["role"]) if out else "assistant"
             if prev_role == "assistant" and _is_user_short(content):
                 role = "user"
             elif prev_role == "user" and _is_agent_content(content) and len(content) > 40:
@@ -128,17 +134,27 @@ def fix_transcript_speaker_roles(turns: list[dict], agent_name: str = "") -> lis
             if not _is_agent_content(content):
                 role = "user"
 
+        # Map to display names: "assistant" → agent name, "user" → lead name or "User"
+        _lead = (raw_role if raw_role and _normalize_role(raw_role) == "user" and raw_role.lower() not in ("user",) else "User")
         rec = dict(turn)
-        rec["role"] = "assistant" if role == "assistant" else "user"
+        rec["role"] = _display_agent if role == "assistant" else _lead
         rec["content"] = content
         out.append(rec)
 
     # Global swap if majority of long agent pitches sit under user
-    user_agentish = sum(1 for t in out if t["role"] == "user" and _is_agent_content(t["content"]))
-    asst_usershort = sum(1 for t in out if t["role"] == "assistant" and _is_user_short(t["content"]))
+    user_agentish = sum(
+        1 for t in out
+        if _normalize_role(t["role"]) == "user" and _is_agent_content(t["content"])
+    )
+    asst_usershort = sum(
+        1 for t in out
+        if _normalize_role(t["role"]) == "assistant" and _is_user_short(t["content"])
+    )
     if user_agentish >= 2 and user_agentish > asst_usershort:
         for t in out:
-            t["role"] = "user" if t["role"] == "assistant" else "assistant"
+            nr = _normalize_role(t["role"])
+            # Swap: roles currently normalized as "user" become agent, and vice versa
+            t["role"] = _display_agent if nr == "user" else "User"
 
     return out
 

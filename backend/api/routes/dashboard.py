@@ -256,6 +256,29 @@ def _to_ts(value: Any) -> float:
     return 0.0
 
 
+def _source_display(lead: dict) -> str:
+    """Return the display-friendly source label, showing broker name for digital leads."""
+    source = lead.get("source") or "campaign"
+    if source == "digital":
+        extra_raw = lead.get("extra")
+        extra_obj = {}
+        if extra_raw:
+            try:
+                parsed = json.loads(extra_raw) if isinstance(extra_raw, str) else extra_raw
+                if isinstance(parsed, dict):
+                    extra_obj = parsed
+            except Exception:
+                extra_obj = {}
+        broker_id = extra_obj.get("broker_id", "")
+        broker_display = {
+            "broker_1": "Broker 1",
+            "broker_2": "Broker 2",
+            "broker_3": "Broker 3",
+        }.get(broker_id, "Digital")
+        return broker_display
+    return source
+
+
 def _lead_payload(row: Any, *, include_transcript: bool = False) -> dict:
     lead = dict(row)
     status = _display_status(lead)
@@ -294,7 +317,7 @@ def _lead_payload(row: Any, *, include_transcript: bool = False) -> dict:
         "email": lead.get("email") or "",
         "company": lead.get("company") or "",
         "segment": lead.get("segment") or lead.get("source_file") or "",
-        "source": lead.get("source") or "campaign",
+        "source": _source_display(lead),
         "role": lead.get("role") or "",
         "upload_source": (extra_obj.get("upload_source") or lead.get("source_file") or ""),
         "broker_id": extra_obj.get("broker_id") or "",
@@ -418,10 +441,19 @@ async def dashboard_overview(role: str = Query("")):
             "conversion_rate": round(len(interested) / len(called) * 100, 1) if called else 0,
         })
     total = leads
+    active_jobs = [l for l in total if l.get("workflow_status") in ("claimed", "running")]
+    sandbox_1_digital_calls = [j for j in active_jobs if j.get("extra", {}).get("eligible_pool") == "sandbox1_digital"]
+    sandbox_1_digital_2_calls = [j for j in active_jobs if j.get("extra", {}).get("eligible_pool") == "sandbox1_digital_2"]
+    sandbox_1_digital_3_calls = [j for j in active_jobs if j.get("extra", {}).get("eligible_pool") == "sandbox1_digital_3"]
     return {
         "as_of": time.time(),
         "total_leads": len(total),
         "called_count": sum(1 for l in total if l["called_at_iso"]),
         "interested": sum(1 for l in total if l["disposition"] == "Interested"),
         "sandboxes": sandboxes,
+        "broker_stats": {
+            "broker_1": {"active_calls": len(sandbox_1_digital_calls), "line": "P3"},
+            "broker_2": {"active_calls": len(sandbox_1_digital_2_calls), "line": "P10"},
+            "broker_3": {"active_calls": len(sandbox_1_digital_3_calls), "line": "P11"},
+        },
     }

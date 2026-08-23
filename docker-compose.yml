@@ -17,6 +17,22 @@ x-backend-env: &backend-env
   PGDATABASE: technopoliss
   PGUSER: technopoliss
       PGPASSWORD: ${POSTGRES_PASSWORD:-technopoliss}
+  # Digital broker phone lines
+  DIGITAL_BROKER_1_PHONE: P3
+  DIGITAL_BROKER_2_PHONE: P10
+  DIGITAL_BROKER_3_PHONE: P11
+  # Gemini voice & language for Indian English
+  GEMINI_LIVE_VOICE: Kore
+  GEMINI_LIVE_LANGUAGE: en-IN
+  # Ultra-low latency — human-like response speed (millisecond VAD)
+  GEMINI_LIVE_TEMPERATURE: "0.95"
+  GEMINI_LIVE_START_SENSITIVITY: HIGH
+  GEMINI_LIVE_END_SENSITIVITY: HIGH
+  GEMINI_LIVE_AGGRESSIVE_ACTIVITY_DETECTION: "1"
+  GEMINI_LIVE_VAD_PREFIX_PADDING_MS: "100"
+  GEMINI_LIVE_VAD_SILENCE_DURATION_MS: "200"
+  # Greeting style prompt for Telugu-primary conversation
+  GEMINI_OPENING_STYLE_PROMPT_FEMALE: "TELUGU PRIMARY — speak this greeting in warm, natural Telugu with a Hyderabadi accent. Start with Namaskaram, introduce yourself as Vernika from Technopolis Constructions. Speak like a real Hyderabadi woman, not TTS. When caller switches language, mirror them instantly."
   # Gemini + Vobiz credentials and every runtime setting come from backend/.env
   ENV_FILE_GUARD: "1"
 

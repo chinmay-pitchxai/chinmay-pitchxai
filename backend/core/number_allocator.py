@@ -1,4 +1,4 @@
-"""Strict P1-P9 eligibility for the four-sandbox calling pipeline."""
+"""Strict P1-P11 eligibility for the four-sandbox calling pipeline."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from core.workflow_models import JobType, NumberPool
 DEFAULT_POOLS: dict[NumberPool, tuple[str, ...]] = {
     NumberPool.SANDBOX1_FRESH: ("P1", "P2"),
     NumberPool.SANDBOX1_DIGITAL: ("P3",),
+    NumberPool.SANDBOX1_DIGITAL_2: ("P10",),
+    NumberPool.SANDBOX1_DIGITAL_3: ("P11",),
     NumberPool.SANDBOX1_CALLBACK: ("P1", "P2", "P3"),
     NumberPool.SANDBOX2_RETRY_2: ("P4",),
     NumberPool.SANDBOX2_RETRY_3_COLD: ("P5",),
@@ -21,7 +23,13 @@ DEFAULT_POOLS: dict[NumberPool, tuple[str, ...]] = {
 }
 
 
-def pool_for(job_type: JobType | str, source: str, attempt_number: int = 0, sandbox: int = 1) -> NumberPool:
+def pool_for(
+    job_type: JobType | str,
+    source: str,
+    attempt_number: int = 0,
+    sandbox: int = 1,
+    extra: dict | None = None,
+) -> NumberPool:
     job_type = JobType(job_type)
     source = (source or "").strip().lower()
     digital = source in ("digital", "digital_marketing")
@@ -39,7 +47,14 @@ def pool_for(job_type: JobType | str, source: str, attempt_number: int = 0, sand
     if job_type == JobType.POST_VISIT_FEEDBACK:
         return NumberPool.SANDBOX4_FEEDBACK
     if job_type == JobType.FRESH_CALL:
-        return NumberPool.SANDBOX1_DIGITAL if digital else NumberPool.SANDBOX1_FRESH
+        if digital:
+            broker_id = (extra or {}).get("broker_id", "") if extra else ""
+            if broker_id == "broker_2":
+                return NumberPool.SANDBOX1_DIGITAL_2
+            elif broker_id == "broker_3":
+                return NumberPool.SANDBOX1_DIGITAL_3
+            return NumberPool.SANDBOX1_DIGITAL
+        return NumberPool.SANDBOX1_FRESH
     if job_type == JobType.FAILED_RETRY:
         if attempt_number == 2:
             return NumberPool.SANDBOX2_RETRY_2
@@ -86,12 +101,12 @@ def relationship_number_for_source(source: str, pools=None) -> str | None:
 def configured_pools(settings_obj=None) -> dict[NumberPool, tuple[str, ...]]:
     if settings_obj is None:
         from config import settings as settings_obj
-    values = {i: str(getattr(settings_obj, f"p{i}_number", "") or "").strip() for i in range(1, 10)}
+    values = {i: str(getattr(settings_obj, f"p{i}_number", "") or "").strip() for i in range(1, 12)}
     try:
         from core.state import _ROLES, get_state
         for role in _ROLES:
             state = get_state(role)
-            for i in range(1, 10):
+            for i in range(1, 12):
                 value = str(state.get(f"p{i}_number", "") or "").strip()
                 if value:
                     values[i] = value
@@ -108,6 +123,8 @@ def configured_pools(settings_obj=None) -> dict[NumberPool, tuple[str, ...]]:
         # tracking allows two simultaneous digital dials — plan: "2 concurrency
         # calls, from P3 make call to 2 leads").
         NumberPool.SANDBOX1_DIGITAL: lines(3, 3),
+        NumberPool.SANDBOX1_DIGITAL_2: lines(10),
+        NumberPool.SANDBOX1_DIGITAL_3: lines(11),
         NumberPool.SANDBOX1_CALLBACK: lines(1, 2, 3),
         NumberPool.SANDBOX2_RETRY_2: lines(4),
         NumberPool.SANDBOX2_RETRY_3_COLD: lines(5),
@@ -127,6 +144,8 @@ def validate_live_pools(pools=None, *, allow_shared_test_numbers: bool | None = 
     required = {
         NumberPool.SANDBOX1_FRESH: "cold first touch",
         NumberPool.SANDBOX1_DIGITAL: "digital first touch",
+        NumberPool.SANDBOX1_DIGITAL_2: "digital broker 2",
+        NumberPool.SANDBOX1_DIGITAL_3: "digital broker 3",
         NumberPool.SANDBOX1_CALLBACK: "callbacks",
         NumberPool.SANDBOX2_RETRY_2: "retry attempt 2",
         NumberPool.SANDBOX2_RETRY_3_COLD: "cold retry attempt 3",

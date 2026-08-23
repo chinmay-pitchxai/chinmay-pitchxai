@@ -193,8 +193,8 @@ async def lifespan(app: FastAPI):
 
     scheduler_task = None
     orchestration_task = None
-    digital_excel_task = None
-    google_sheets_task = None
+    digital_excel_tasks: list = []
+    google_sheets_tasks: list = []
     if settings.webhook_only_mode:
         logger.info("WEBHOOK_ONLY_MODE — campaign scheduler not started on this host.")
     else:
@@ -221,20 +221,33 @@ async def lifespan(app: FastAPI):
                 _digital_excel_dir = _Path(settings.digital_excel_path).expanduser()
                 _digital_excel_dir.mkdir(parents=True, exist_ok=True)
                 logger.info("Sandbox 1.2 digital Excel feed path ready: {}", _digital_excel_dir)
+                for _bid in ("broker_1", "broker_2", "broker_3"):
+                    (_digital_excel_dir / _bid).mkdir(parents=True, exist_ok=True)
             except Exception as _dex_exc:
                 logger.warning("Could not ensure digital Excel feed path: {}", _dex_exc)
-            from services.digital_excel_ingest import digital_excel_watcher
-
-            digital_excel_task = asyncio.create_task(
-                digital_excel_watcher(), name="sandbox-1-2-digital-excel-watcher"
+            from services.digital_excel_ingest import (
+                digital_excel_broker_1_watcher,
+                digital_excel_broker_2_watcher,
+                digital_excel_broker_3_watcher,
             )
-            logger.info("Sandbox 1.2 digital Excel watcher started.")
+            digital_excel_tasks = [
+                asyncio.create_task(digital_excel_broker_1_watcher(), name="sandbox-1-2-excel-broker-1-watcher"),
+                asyncio.create_task(digital_excel_broker_2_watcher(), name="sandbox-1-2-excel-broker-2-watcher"),
+                asyncio.create_task(digital_excel_broker_3_watcher(), name="sandbox-1-2-excel-broker-3-watcher"),
+            ]
+            logger.info("Sandbox 1.2 digital Excel watchers started (3 parallel broker workers).")
         if settings.digital_broker_1_sheet_url or settings.digital_broker_2_sheet_url or settings.digital_broker_3_sheet_url:
-            from services.google_sheets_ingest import google_sheets_watcher
-            google_sheets_task = asyncio.create_task(
-                google_sheets_watcher(), name="sandbox-1-2-google-sheets-watcher"
+            from services.google_sheets_ingest import (
+                google_sheets_broker_1_watcher,
+                google_sheets_broker_2_watcher,
+                google_sheets_broker_3_watcher,
             )
-            logger.info("Sandbox 1.2 Google Sheets watcher started.")
+            google_sheets_tasks = [
+                asyncio.create_task(google_sheets_broker_1_watcher(), name="sandbox-1-2-broker-1-watcher"),
+                asyncio.create_task(google_sheets_broker_2_watcher(), name="sandbox-1-2-broker-2-watcher"),
+                asyncio.create_task(google_sheets_broker_3_watcher(), name="sandbox-1-2-broker-3-watcher"),
+            ]
+            logger.info("Sandbox 1.2 Google Sheets watchers started (3 parallel broker workers).")
 
     agents_task = None
     boss_task = None
@@ -304,12 +317,16 @@ async def lifespan(app: FastAPI):
     if orchestration_task and not orchestration_task.done():
         orchestration_task.cancel()
         logger.info("Autonomous orchestration supervisor stopped.")
-    if digital_excel_task and not digital_excel_task.done():
-        digital_excel_task.cancel()
-        logger.info("Sandbox 1.2 digital Excel watcher stopped.")
-    if google_sheets_task and not google_sheets_task.done():
-        google_sheets_task.cancel()
-        logger.info("Sandbox 1.2 Google Sheets watcher stopped.")
+    for _t in digital_excel_tasks:
+        if not _t.done():
+            _t.cancel()
+    if digital_excel_tasks:
+        logger.info("Sandbox 1.2 digital Excel watchers stopped.")
+    for _t in google_sheets_tasks:
+        if not _t.done():
+            _t.cancel()
+    if google_sheets_tasks:
+        logger.info("Sandbox 1.2 Google Sheets watchers stopped.")
     for role, task in list(_CAMPAIGN_TASKS.items()):
         if task and not task.done():
             task.cancel()

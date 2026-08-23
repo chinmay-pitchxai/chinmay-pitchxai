@@ -2481,6 +2481,30 @@ async def handle_vobiz_ws_live(
                 'Ask the name verification question immediately.\n',
                 anchor,
             )
+
+        # Strip greeting text references from base prompt so the AI cannot
+        # re-introduce itself after the pre-rendered greeting audio plays.
+        if greeting_text:
+            _greeting_escaped = _re.escape(greeting_text)
+            _base_system_prompt = _re.sub(
+                rf'["\']?.*?{_greeting_escaped}.*?["\']?\s*\n?',
+                '',
+                _base_system_prompt,
+            )
+            # Also strip any "Your opening line on this call: ..." containing the greeting
+            _base_system_prompt = _re.sub(
+                r'Your opening line on this call:.*?\n',
+                '',
+                _base_system_prompt,
+            )
+        # Inject a do-not-reintroduce rule into the system instruction
+        _base_system_prompt += (
+            "\n\n[GREETING HANDOFF — THE PRE-RENDERED GREETING AUDIO HAS ALREADY PLAYED]\n"
+            "The greeting audio already introduced you with your name and company.\n"
+            "After the greeting plays, do NOT re-introduce yourself.\n"
+            "Do NOT say your name again. Do NOT say the company name again.\n"
+            "Start directly with the purpose of your call or name verification.\n"
+        )
         
         # Determine pitch target based on role
         _pitch_target = "Solitaire Unity premium apartments"
@@ -2640,7 +2664,7 @@ async def handle_vobiz_ws_live(
             try:
                 from services.campaign_live import push_transcript
 
-                push_transcript(camp_id, "assistant", opening_line)
+                push_transcript(camp_id, "Vernika", opening_line)
             except Exception as _ce:
                 logger.warning("live transcript push (opening) failed: {}", _ce)
 
@@ -5416,11 +5440,12 @@ async def handle_vobiz_ws_live(
                             rag_prefetch_cache["__warm__"] = _warm_rag
                         u_turn = (last_in_user or "").strip()
                         if u_turn:
-                            append_turn(live_log_id, "user", u_turn, "vobiz-live", base_dir=log_dir)
+                            _user_label = (_authoritative_lead_name or "User").strip() or "User"
+                            append_turn(live_log_id, _user_label, u_turn, "vobiz-live", base_dir=log_dir)
                             if camp_id:
                                 try:
                                     from services.campaign_live import push_transcript
-                                    push_transcript(camp_id, "user", u_turn)
+                                    push_transcript(camp_id, _user_label, u_turn)
                                 except Exception as _ce:
                                     logger.warning("live transcript push (user) failed: {}", _ce)
                             last_in_user = ""
@@ -5464,11 +5489,11 @@ async def handle_vobiz_ws_live(
                                 )
                             elif _looks_like_account_manager_cta_asked(a_turn):
                                 _track_account_manager_cta("turnComplete")
-                            append_turn(live_log_id, "assistant", a_turn, "vobiz-live", base_dir=log_dir)
+                            append_turn(live_log_id, "Vernika", a_turn, "vobiz-live", base_dir=log_dir)
                             if camp_id:
                                 try:
                                     from services.campaign_live import push_transcript
-                                    push_transcript(camp_id, "assistant", a_turn)
+                                    push_transcript(camp_id, "Vernika", a_turn)
                                 except Exception as _ce:
                                     logger.warning("live transcript push (assistant) failed: {}", _ce)
                             last_out_assistant = ""
@@ -6041,19 +6066,24 @@ async def handle_vobiz_ws_live(
         logger.exception("Vobiz live WS error: {}", exc)
     finally:
         # Flush STT buffered at disconnect (turnComplete may not fire on hangup).
-        for _role_label, _content in (
+        _flush_labels = {
+            "user": (_authoritative_lead_name or "User").strip() or "User",
+            "assistant": "Vernika",
+        }
+        for _raw_role, _content in (
             ("user", (_pending_transcript.get("user") or "").strip()),
             ("assistant", (_pending_transcript.get("assistant") or "").strip()),
         ):
             if _content:
-                append_turn(live_log_id, _role_label, _content, "vobiz-live", base_dir=log_dir)
+                _fl = _flush_labels.get(_raw_role, _raw_role)
+                append_turn(live_log_id, _fl, _content, "vobiz-live", base_dir=log_dir)
                 if camp_id:
                     try:
                         from services.campaign_live import push_transcript
 
-                        push_transcript(camp_id, _role_label, _content)
+                        push_transcript(camp_id, _fl, _content)
                     except Exception as _ce:
-                        logger.warning("live transcript flush ({}) failed: {}", _role_label, _ce)
+                        logger.warning("live transcript flush ({}) failed: {}", _fl, _ce)
         _pending_transcript["user"] = ""
         _pending_transcript["assistant"] = ""
 

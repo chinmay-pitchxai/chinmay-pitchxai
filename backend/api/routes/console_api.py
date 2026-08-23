@@ -368,7 +368,7 @@ async def get_tuning(request: Request):
     _lang, _mirror = resolved_live_language(role)
     result["language"] = _lang
     result["multilingual_mirror"] = _mirror
-    for i in range(1, 10):
+    for i in range(1, 12):
         result[f"p{i}_number"] = state.get(f"p{i}_number", "") or getattr(settings, f"p{i}_number", "") or ""
     return result
 
@@ -385,6 +385,8 @@ class TuningUpdate(BaseModel):
     p7_number: str = ""
     p8_number: str = ""
     p9_number: str = ""
+    p10_number: str = ""
+    p11_number: str = ""
     # Voice & language plug-and-play (mirrors Gemini Live languageCode + prompt)
     language: str = ""            # primary language code, e.g. "te-IN" (Telugu)
     multilingual_mirror: bool = True  # mirror the caller's language when different
@@ -447,9 +449,9 @@ async def update_tuning(data: TuningUpdate, request: Request):
         raise HTTPException(400, tuning_err)
 
     greeting_out = coerce_stored_greeting(role, greeting_val)
-    # Collect P1-P9 phone numbers from request
+    # Collect P1-P11 phone numbers from request
     phone_nums = {}
-    for i in range(1, 10):
+    for i in range(1, 12):
         val = getattr(data, f"p{i}_number", "") or ""
         phone_nums[f"p{i}_number"] = val.strip()
     save_role_state(role, prompt=prompt_val, rag=rag_val, greeting_text=greeting_out, **phone_nums)
@@ -513,6 +515,65 @@ async def update_tuning(data: TuningUpdate, request: Request):
         logger.warning("Prompt version save failed (non-fatal): {}", exc)
 
     return {"status": "ok", "saved_role": role}
+
+
+@router.get("/api/console/config")
+async def get_config():
+    """Get current backend configuration."""
+    return {
+        "voice": settings.gemini_live_voice,
+        "voice_sales_1": settings.gemini_live_voice_sales_1,
+        "language": settings.gemini_live_language,
+        "temperature": settings.gemini_live_temperature,
+        "rag_enabled": settings.rag_enabled,
+        "max_concurrent_calls": settings.max_concurrent_calls,
+        "orchestration_live_enabled": settings.orchestration_live_enabled,
+    }
+
+
+@router.post("/api/console/config")
+async def update_config(request: Request):
+    """Update backend configuration from frontend. Changes take effect immediately."""
+    body = await request.json()
+
+    # Map frontend field names to settings attributes
+    field_map = {
+        "voice": "gemini_live_voice",
+        "voice_sales_1": "gemini_live_voice_sales_1",
+        "language": "gemini_live_language",
+        "temperature": "gemini_live_temperature",
+        "greeting_style": "gemini_opening_style_prompt_female",
+        "tts_style": "gemini_tts_style_prompt_female",
+        "rag_enabled": "rag_enabled",
+        "max_concurrent_calls": "max_concurrent_calls",
+        "orchestration_live_enabled": "orchestration_live_enabled",
+    }
+
+    updated = []
+    for key, value in body.items():
+        attr = field_map.get(key)
+        if attr and hasattr(settings, attr):
+            old_val = getattr(settings, attr)
+            # Handle type coercion
+            if isinstance(old_val, bool):
+                value = str(value).lower() in ("1", "true", "yes", "on")
+            elif isinstance(old_val, int):
+                value = int(value)
+            elif isinstance(old_val, float):
+                value = float(value)
+            setattr(settings, attr, value)
+            updated.append(f"{attr}: {old_val} -> {value}")
+
+    # Force greeting PCM cache invalidation if voice or greeting text changed
+    if "voice" in body or "greeting_style" in body or "language" in body:
+        from core.greeting_pcm import invalidate_greeting_cache
+        try:
+            invalidate_greeting_cache("sales_1")
+        except Exception:
+            pass
+
+    logger.info("Console config updated: {}", updated)
+    return {"status": "updated", "changes": updated}
 
 
 # ─── Prompt Versioning API ───
@@ -962,7 +1023,7 @@ async def get_vobiz_config(request: Request):
             and (settings.vobiz_sales_1_auth_token or "").strip()
         ),
     }
-    for i in range(1, 10):
+    for i in range(1, 12):
         result[f"p{i}_number"] = state.get(f"p{i}_number", "") or getattr(settings, f"p{i}_number", "") or ""
     return result
 
@@ -1469,9 +1530,10 @@ async def incoming_call_reanalyze(
         raise HTTPException(400, "Call has no log_id transcript yet")
 
     transcript = ""
+    _inc_lead = str((row.get("caller_name") or row.get("callee_name") or "")).strip()
     try:
         from services.transcriber import transcribe_audio
-        transcribed = await transcribe_audio(log_id, role)
+        transcribed = await transcribe_audio(log_id, role, lead_name=_inc_lead)
         if transcribed:
             transcript = transcribed
             logger.info("Incoming reanalyze: audio transcription successful for call_id={}", call_id)

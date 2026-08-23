@@ -131,14 +131,18 @@ def build_analysis_prompt(transcript_text: str, *, role: str = "") -> str:
 
 
 def _build_buyer_analysis_prompt(transcript_text: str) -> str:
+    from services.transcript_hybrid import _normalize_role
+
     lines = []
     for line in transcript_text.splitlines():
         try:
             obj = json.loads(line)
-            role = obj.get("role") or obj.get("type", "")
+            raw_role = str(obj.get("role") or obj.get("type", "")).strip()
             content = obj.get("content") or obj.get("text") or obj.get("message", "")
+            role = _normalize_role(raw_role)
             if role in ("user", "assistant") and content:
-                lines.append(f"{role.capitalize()}: {content.strip()}")
+                display = raw_role if raw_role and raw_role.lower() not in ("user", "assistant") else role.capitalize()
+                lines.append(f"{display}: {content.strip()}")
         except Exception:
             continue
 
