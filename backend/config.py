@@ -220,26 +220,26 @@ class Settings:
     gemini_live_activity_handling: str = (
         os.getenv("GEMINI_LIVE_ACTIVITY_HANDLING", "START_OF_ACTIVITY_INTERRUPTS").strip()
     )
-    gemini_live_vad_prefix_padding_ms: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_MS", "32"))
-    gemini_live_vad_silence_duration_ms: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_MS", "80"))
-    gemini_live_vad_prefix_padding_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_ULTRA_MS", "24"))
-    gemini_live_vad_silence_duration_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_ULTRA_MS", "60"))
+    gemini_live_vad_prefix_padding_ms: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_MS", "100") or "100")
+    gemini_live_vad_silence_duration_ms: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_MS", "200") or "200")
+    gemini_live_vad_prefix_padding_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_PREFIX_PADDING_ULTRA_MS", "80") or "80")
+    gemini_live_vad_silence_duration_ms_ultra: int = int(os.getenv("GEMINI_LIVE_VAD_SILENCE_DURATION_ULTRA_MS", "150") or "150")
     # Configurable sensitivity levels.
     # App aliases NORMAL map to HIGH on the wire in gemini_protocol.build_live_setup.
     # Gemini Live only accepts HIGH / LOW / UNSPECIFIED (NORMAL → 1007 if sent raw).
     gemini_live_start_sensitivity: str = (
         os.getenv("GEMINI_LIVE_START_SENSITIVITY")
         or os.getenv("GEMINI_LIVE_VAD_START_SENSITIVITY")
-        or "START_SENSITIVITY_NORMAL"
+        or "HIGH"
     ).strip()
     gemini_live_end_sensitivity: str = (
         os.getenv("GEMINI_LIVE_END_SENSITIVITY")
         or os.getenv("GEMINI_LIVE_VAD_END_SENSITIVITY")
-        or "END_SENSITIVITY_NORMAL"
+        or "HIGH"
     ).strip()
     # Appended system text nudging concise turns + yield-on-overlap (phone calls).
     gemini_live_append_turn_instructions: bool = _b("GEMINI_LIVE_APPEND_TURN_INSTRUCTIONS", True)
-    gemini_live_temperature: float = float(os.getenv("GEMINI_LIVE_TEMPERATURE", "0.65"))
+    gemini_live_temperature: float = float(os.getenv("GEMINI_LIVE_TEMPERATURE", "0.95") or "0.95")
     # When no scripted PCM opening: brief gate before forwarding callee mic → Gemini (avoids chopping first model syllable).
     vobiz_gemini_live_forward_mute_seconds: float = float(
         os.getenv("VOBIZ_GEMINI_FORWARD_MUTE_SECONDS", "0.05")

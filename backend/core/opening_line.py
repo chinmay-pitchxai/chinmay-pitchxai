@@ -7,21 +7,21 @@ import re
 
 # Indian-style greetings
 INDIAN_GREETINGS = [
+    "Namaskaram! Nenu Vernika Technopolis Constructions nundi. Meeku ela unaru?",
     "Namaste! This is Vernika from Technopolis Constructions. Kaise hain aap?",
-    "Namaskaram! This is Vernika from Technopolis Constructions. How are you doing today?",
-    "Hello! This is Vernika from Technopolis Constructions. Aap kaise hain?",
-    "Hi there! This is Vernika from Technopolis Constructions. Meeku ela unaru?",
+    "Hello! Nenu Vernika Technopolis Constructions nundi. Meeku ela unaru?",
+    "Hi there! This is Vernika from Technopolis Constructions. How are you doing today?",
 ]
 
-# Default greeting (warm Indian English)
-DEFAULT_GREETING = "Namaste! This is Vernika from Technopolis Constructions. Kaise hain aap?"
+# Default greeting in Telugu (primary language)
+DEFAULT_GREETING = "Namaskaram! Nenu Vernika Technopolis Constructions nundi. Meeku ela unaru?"
 
 _ROLE_FALLBACK_GREETINGS = {
     # Technopolis — Solitaire Unity (single active role). The agent NAME is
     # interpolated from the operator's saved prompt (extract_agent_name), so
     # the AI never introduces itself with a stale hardcoded name.
     "sales_1": (
-        "Namaste! This is {agent_name} from Technopolis Constructions. Aap kaise hain aaj?"
+        "Namaskaram! Nenu {agent_name} Technopolis Constructions nundi. Meeku ela unaru aaj?"
     ),
 }
 

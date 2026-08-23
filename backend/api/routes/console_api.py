@@ -517,6 +517,65 @@ async def update_tuning(data: TuningUpdate, request: Request):
     return {"status": "ok", "saved_role": role}
 
 
+@router.get("/api/console/config")
+async def get_config():
+    """Get current backend configuration."""
+    return {
+        "voice": settings.gemini_live_voice,
+        "voice_sales_1": settings.gemini_live_voice_sales_1,
+        "language": settings.gemini_live_language,
+        "temperature": settings.gemini_live_temperature,
+        "rag_enabled": settings.rag_enabled,
+        "max_concurrent_calls": settings.max_concurrent_calls,
+        "orchestration_live_enabled": settings.orchestration_live_enabled,
+    }
+
+
+@router.post("/api/console/config")
+async def update_config(request: Request):
+    """Update backend configuration from frontend. Changes take effect immediately."""
+    body = await request.json()
+
+    # Map frontend field names to settings attributes
+    field_map = {
+        "voice": "gemini_live_voice",
+        "voice_sales_1": "gemini_live_voice_sales_1",
+        "language": "gemini_live_language",
+        "temperature": "gemini_live_temperature",
+        "greeting_style": "gemini_opening_style_prompt_female",
+        "tts_style": "gemini_tts_style_prompt_female",
+        "rag_enabled": "rag_enabled",
+        "max_concurrent_calls": "max_concurrent_calls",
+        "orchestration_live_enabled": "orchestration_live_enabled",
+    }
+
+    updated = []
+    for key, value in body.items():
+        attr = field_map.get(key)
+        if attr and hasattr(settings, attr):
+            old_val = getattr(settings, attr)
+            # Handle type coercion
+            if isinstance(old_val, bool):
+                value = str(value).lower() in ("1", "true", "yes", "on")
+            elif isinstance(old_val, int):
+                value = int(value)
+            elif isinstance(old_val, float):
+                value = float(value)
+            setattr(settings, attr, value)
+            updated.append(f"{attr}: {old_val} -> {value}")
+
+    # Force greeting PCM cache invalidation if voice or greeting text changed
+    if "voice" in body or "greeting_style" in body or "language" in body:
+        from core.greeting_pcm import invalidate_greeting_cache
+        try:
+            invalidate_greeting_cache("sales_1")
+        except Exception:
+            pass
+
+    logger.info("Console config updated: {}", updated)
+    return {"status": "updated", "changes": updated}
+
+
 # ─── Prompt Versioning API ───
 
 @router.get("/api/tuning/versions")
