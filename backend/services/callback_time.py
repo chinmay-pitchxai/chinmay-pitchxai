@@ -121,9 +121,10 @@ def parse_relative_time_from_transcript(transcript_text: str, base_time: datetim
     for line in transcript_text.splitlines():
         try:
             obj = json.loads(line)
-            role = obj.get("role") or obj.get("type", "")
+            raw_role = str(obj.get("role") or obj.get("type", "")).strip()
             content = obj.get("content") or obj.get("text") or obj.get("message", "")
-            if role == "user" and content:
+            from services.transcript_hybrid import _normalize_role
+            if _normalize_role(raw_role) == "user" and content:
                 user_texts.append(content.strip().lower())
         except Exception:
             continue

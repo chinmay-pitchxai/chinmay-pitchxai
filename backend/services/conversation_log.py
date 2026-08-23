@@ -165,34 +165,36 @@ try:
     class ConversationUserLogger(FrameProcessor):
         """After STT (+ optional RAG): log user transcription."""
 
-        def __init__(self, session_id: str, channel: str) -> None:
+        def __init__(self, session_id: str, channel: str, lead_name: str = "User") -> None:
             super().__init__()
             self._session_id = session_id
             self._channel = channel
+            self._lead_name = (lead_name or "User").strip() or "User"
 
         async def process_frame(self, frame, direction) -> None:
             await super().process_frame(frame, direction)
             if isinstance(frame, TranscriptionFrame):
                 t = (frame.text or "").strip()
                 if t:
-                    append_turn(self._session_id, "user", t, self._channel)
+                    append_turn(self._session_id, self._lead_name, t, self._channel)
             await self.push_frame(frame, direction)
 
 
     class ConversationAssistantLogger(FrameProcessor):
         """After LLM: log assistant text (same text sent to TTS)."""
 
-        def __init__(self, session_id: str, channel: str) -> None:
+        def __init__(self, session_id: str, channel: str, agent_name: str = "Vernika") -> None:
             super().__init__()
             self._session_id = session_id
             self._channel = channel
+            self._agent_name = (agent_name or "Vernika").strip() or "Vernika"
 
         async def process_frame(self, frame, direction) -> None:
             await super().process_frame(frame, direction)
             if isinstance(frame, TextFrame):
                 t = (frame.text or "").strip()
                 if t:
-                    append_turn(self._session_id, "assistant", t, self._channel)
+                    append_turn(self._session_id, self._agent_name, t, self._channel)
             await self.push_frame(frame, direction)
 
 except Exception:

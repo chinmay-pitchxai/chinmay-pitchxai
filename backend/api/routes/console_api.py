@@ -1469,9 +1469,10 @@ async def incoming_call_reanalyze(
         raise HTTPException(400, "Call has no log_id transcript yet")
 
     transcript = ""
+    _inc_lead = str((row.get("caller_name") or row.get("callee_name") or "")).strip()
     try:
         from services.transcriber import transcribe_audio
-        transcribed = await transcribe_audio(log_id, role)
+        transcribed = await transcribe_audio(log_id, role, lead_name=_inc_lead)
         if transcribed:
             transcript = transcribed
             logger.info("Incoming reanalyze: audio transcription successful for call_id={}", call_id)

@@ -137,6 +137,8 @@ _GENERIC_NON_PROPERTY_INTEREST = re.compile(
 
 
 def _iter_turns(transcript_text: str) -> Iterable[tuple[str, str]]:
+    from services.transcript_hybrid import _normalize_role
+
     for line in (transcript_text or "").splitlines():
         line = line.strip()
         if not line:
@@ -145,7 +147,8 @@ def _iter_turns(transcript_text: str) -> Iterable[tuple[str, str]]:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
-        role = str(obj.get("role") or obj.get("type") or "").strip().lower()
+        raw_role = str(obj.get("role") or obj.get("type") or "").strip()
+        role = _normalize_role(raw_role)
         if role not in ("user", "assistant"):
             continue
         content = str(obj.get("content") or obj.get("text") or obj.get("message") or "").strip()

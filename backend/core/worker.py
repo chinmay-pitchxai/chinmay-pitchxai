@@ -1368,7 +1368,7 @@ async def _finalize_voicemail_lead(
         pass
 
 
-async def _resolve_call_transcript(role: str, log_id: str) -> tuple[str, str]:
+async def _resolve_call_transcript(role: str, log_id: str, lead_name: str = "") -> tuple[str, str]:
     """Hybrid transcript: coalesced live JSONL when sufficient, else audio. Returns (text, source)."""
     from prompts.role_prompts import extract_agent_name
     from services.transcriber import transcribe_audio
@@ -1381,6 +1381,7 @@ async def _resolve_call_transcript(role: str, log_id: str) -> tuple[str, str]:
         read_jsonl=_read_live_jsonl_only,
         transcribe_audio=transcribe_audio,
         agent_name=agent_nm or "",
+        lead_name=lead_name,
     )
     if (transcript or "").strip() and source not in ("empty",):
         _persist_resolved_transcript(role, log_id, transcript, source)
@@ -1740,11 +1741,13 @@ async def _analyze_and_update_lead(
     # lookups resolve correctly (live_session.py sets it on connect, but this
     # provides a fallback for edge cases).
     extra = {}
+    _lead_name_for_transcript = ""
     if lead_id is not None:
         try:
             from core.storage import get_lead
             lead_row = await get_lead(role, lead_id)
             if lead_row:
+                _lead_name_for_transcript = str(lead_row.get("name") or "").strip()
                 raw_extra = lead_row.get("extra")
                 if raw_extra:
                     extra = json.loads(raw_extra) if isinstance(raw_extra, str) else raw_extra
@@ -1823,7 +1826,7 @@ async def _analyze_and_update_lead(
         await _finalize_voicemail_lead(role, lead_id, log_id, extra, duration_sec=duration_sec)
         return
 
-    transcript, tx_source = await _resolve_call_transcript(role, log_id)
+    transcript, tx_source = await _resolve_call_transcript(role, log_id, lead_name=_lead_name_for_transcript)
 
     tx_unreliable = False
     tx_unreliable_reason = ""
@@ -1878,9 +1881,14 @@ async def _analyze_and_update_lead(
         # Try JSONL format first
         try:
             obj = json.loads(line)
-            role_label = (obj.get("role") or obj.get("type", "")).lower()
+            _raw_role = (obj.get("role") or obj.get("type", "")).strip()
+            role_label = _raw_role.lower()
             turn_content = (obj.get("content") or obj.get("text") or obj.get("message", "")).strip()
-            if role_label == "user" and _is_valid_turn_content(turn_content):
+            # Accept both canonical "user" and the lead's name as user turns
+            _is_user_turn = role_label == "user" or (
+                _raw_role and _raw_role != "Vernika" and _raw_role.lower() not in ("assistant", "vernika", "agent")
+            )
+            if _is_user_turn and _is_valid_turn_content(turn_content):
                 from services.transcript_thin import user_turn_is_plausible
 
                 if user_turn_is_plausible(turn_content):
@@ -2850,6 +2858,9 @@ async def _finalize_manual_call_leg(
         logger.warning("Manual call finalize: no manual_calls row for camp_id={}", camp_id)
         return
 
+    _mc_row = await manual_call_row_by_camp_id(camp_id)
+    _mc_lead_name = str((_mc_row or {}).get("callee_name") or "").strip() if _mc_row else ""
+
     try:
         from services.call_recording import prepare_playback_recording
 
@@ -2885,7 +2896,7 @@ async def _finalize_manual_call_leg(
         )
         return
 
-    transcript, _tx_source = await _resolve_call_transcript(role, live_log_id)
+    transcript, _tx_source = await _resolve_call_transcript(role, live_log_id, lead_name=_mc_lead_name)
 
     if _transcript_indicates_voicemail(transcript):
         logger.info("Manual call {} transcript indicates voicemail — marking Voice Mail", camp_id)
@@ -3216,6 +3227,8 @@ async def _finalize_incoming_call_leg(
         logger.warning("Incoming call finalize: no incoming_calls row for camp_id={}", camp_id)
         return
 
+    _inc_lead_name = str((row or {}).get("caller_name") or row.get("callee_name") or "").strip() if row else ""
+
     try:
         from services.call_recording import prepare_playback_recording
 
@@ -3233,7 +3246,7 @@ async def _finalize_incoming_call_leg(
             exc,
         )
 
-    transcript, _tx_source = await _resolve_call_transcript(role, live_log_id)
+    transcript, _tx_source = await _resolve_call_transcript(role, live_log_id, lead_name=_inc_lead_name)
 
     analysis: dict
     if not (transcript or "").strip():

@@ -56,13 +56,15 @@ def user_turn_is_plausible(content: str) -> bool:
 
 def user_speech_stats(transcript: str) -> tuple[int, int, int]:
     """Return (user_turns, user_chars, total_turns) from JSONL or plain text."""
+    from services.transcript_hybrid import _normalize_role
+
     turns = coalesce_jsonl_turns(transcript or "")
     if not turns:
         return 0, 0, 0
     user_turns = 0
     user_chars = 0
     for t in turns:
-        if str(t.get("role") or "").lower() != "user":
+        if _normalize_role(str(t.get("role") or "")) != "user":
             continue
         content = str(t.get("content") or "").strip()
         if not content:
@@ -74,13 +76,15 @@ def user_speech_stats(transcript: str) -> tuple[int, int, int]:
 
 def plausible_user_speech_stats(transcript: str) -> tuple[int, int, int]:
     """Like user_speech_stats but counts only plausible customer speech."""
+    from services.transcript_hybrid import _normalize_role
+
     turns = coalesce_jsonl_turns(transcript or "")
     if not turns:
         return 0, 0, 0
     user_turns = 0
     user_chars = 0
     for t in turns:
-        if str(t.get("role") or "").lower() != "user":
+        if _normalize_role(str(t.get("role") or "")) != "user":
             continue
         content = str(t.get("content") or "").strip()
         if not content or not user_turn_is_plausible(content):

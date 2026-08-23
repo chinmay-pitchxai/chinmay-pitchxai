@@ -25,6 +25,18 @@ def _is_meaningful(content: str) -> bool:
     return True
 
 
+def _normalize_role(role: str) -> str:
+    """Map display role labels ('Vernika', lead name) back to canonical 'user'/'assistant'."""
+    r = (role or "").strip().lower()
+    if r in ("assistant", "vernika", "agent"):
+        return "assistant"
+    if r in ("user",):
+        return "user"
+    if not r:
+        return ""
+    return "user"
+
+
 def coalesce_jsonl_turns(raw_jsonl: str) -> list[dict]:
     """Merge consecutive same-role fragments from live session logging."""
     turns: list[dict] = []
@@ -36,7 +48,8 @@ def coalesce_jsonl_turns(raw_jsonl: str) -> list[dict]:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
-        role = str(obj.get("role") or obj.get("type") or "").strip().lower()
+        raw_role = str(obj.get("role") or obj.get("type") or "").strip()
+        role = _normalize_role(raw_role)
         content = str(obj.get("content") or obj.get("text") or obj.get("message") or "").strip()
         if role not in ("user", "assistant") or not content:
             continue
@@ -72,7 +85,7 @@ def _user_turn_stats(turns: list[dict]) -> tuple[int, int, int]:
     user_n = 0
     user_chars = 0
     for t in turns:
-        if str(t.get("role") or "").lower() != "user":
+        if _normalize_role(str(t.get("role") or "")) != "user":
             continue
         content = str(t.get("content") or "").strip()
         if not content:
@@ -104,6 +117,7 @@ async def build_call_transcript(
     read_jsonl: Callable[[str, str], str],
     transcribe_audio: Callable,
     agent_name: str = "",
+    lead_name: str = "",
 ) -> tuple[str, str]:
     """Return (transcript_jsonl, source) where source is live_jsonl | audio | empty."""
     raw_jsonl = (read_jsonl(role, log_id) or "").strip()
@@ -173,7 +187,7 @@ async def build_call_transcript(
                     "Hybrid transcript: live JSONL has no user turns — re-transcribing audio log_id={}",
                     log_id,
                 )
-            transcribed = await transcribe_audio(log_id, role)
+            transcribed = await transcribe_audio(log_id, role, lead_name=lead_name)
             if (transcribed or "").strip():
                 audio_text = transcribed.strip()
     except Exception as exc:

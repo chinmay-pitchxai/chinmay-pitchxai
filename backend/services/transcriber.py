@@ -95,7 +95,7 @@ def _resolve_transcribable(log_id: str, date_dir: Path) -> tuple[Path, str] | No
     return None
 
 
-async def transcribe_audio(log_id: str, role: str = "sales_1") -> str | None:
+async def transcribe_audio(log_id: str, role: str = "sales_1", lead_name: str = "") -> str | None:
     date_dir = _find_date_dir(log_id)
     if not date_dir:
         logger.warning("No recording directory found for log_id={}", log_id)
@@ -156,7 +156,8 @@ async def transcribe_audio(log_id: str, role: str = "sales_1") -> str | None:
         "do not summarize, skip, or merge turns.\n\n"
         "SPEAKERS:\n"
         f"- ASSISTANT: the AI agent ({agent_name} from Technopolis Constructions) — usually speaks FIRST.\n"
-        "- USER: the customer/callee on the phone.\n\n"
+        "- CALLER: the customer/callee on the phone.\n\n"
+        "Label speakers as \"ASSISTANT\" for the AI agent and \"CALLER\" for the person being called.\n\n"
         "RULES:\n"
         "1. Indian English, Hindi, Hinglish, Kannada, and code-switching are common — "
         "transcribe exactly what was spoken (native script or clear transliteration).\n"
@@ -314,9 +315,9 @@ async def transcribe_audio(log_id: str, role: str = "sales_1") -> str | None:
             line = line.strip()
             if not line:
                 continue
-            m = re.match(r'^(ASSISTANT|USER|assistant|user)\s*[:]\s*(.+)', line, re.IGNORECASE)
+            m = re.match(r'^(ASSISTANT|USER|CALLER|assistant|user|caller)\s*[:]\s*(.+)', line, re.IGNORECASE)
             if m:
-                speaker = "assistant" if m.group(1).lower() == "assistant" else "user"
+                speaker = "assistant" if m.group(1).lower() in ("assistant",) else "user"
                 tagged.append({"role": speaker, "content": m.group(2).strip()})
 
     if not tagged:
@@ -489,7 +490,7 @@ async def transcribe_audio(log_id: str, role: str = "sales_1") -> str | None:
             turn["role"] = "user" if turn["role"] == "assistant" else "assistant"
 
     # 3. Correct individual segment attributions using agent keywords
-    normalized = post_process_attribution(normalized)
+    normalized = post_process_attribution(normalized, lead_name=lead_name)
 
     from prompts.role_prompts import extract_agent_name
     from services.transcript_roles import fix_transcript_speaker_roles
@@ -546,7 +547,7 @@ def _jsonl_is_live_session(path: Path) -> bool:
     return False
 
 
-def post_process_attribution(turns: list[dict]) -> list[dict]:
+def post_process_attribution(turns: list[dict], lead_name: str = "") -> list[dict]:
     """Correct individual segment speaker diarization errors using agent-identifying keywords."""
     intro_keywords = [
         "this is vernika", "this is vernika from",
@@ -577,4 +578,12 @@ def post_process_attribution(turns: list[dict]) -> list[dict]:
             if any(p in content_lower for p in user_screening_phrases):
                 turn["role"] = "user"
                 logger.info(f"Diarization Correction: Changed turn from assistant to user (screening/hold detected): {turn['content']}")
+    # Map internal roles to display names: "assistant" → "Vernika", "user" → lead name or "User"
+    _lead = (lead_name or "").strip() or "User"
+    for turn in turns:
+        role = turn.get("role")
+        if role == "assistant":
+            turn["role"] = "Vernika"
+        elif role == "user":
+            turn["role"] = _lead
     return turns
