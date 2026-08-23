@@ -210,12 +210,13 @@ async def _generate_and_cache_greeting(role: str, text: str, voice: str) -> Opti
         return None
 
     live_voice = (voice or settings.gemini_live_voice or "Aoede").strip()
-
+    if role == "sales_1" and settings.gemini_live_voice_sales_1:
+        live_voice = settings.gemini_live_voice_sales_1
 
     try:
         from services.live_greeting_capture import capture_live_greeting_pcm
 
-        logger.info("Capturing greeting via Gemini Live for role={} (matches call voice)", role)
+        logger.info("Capturing greeting via Gemini Live for role={} voice={} (matches call voice)", role, live_voice)
         pcm, sr = await capture_live_greeting_pcm(role, text)
         if sr != 16000:
             from services.vobiz_bridge.audio import pcm_resample
